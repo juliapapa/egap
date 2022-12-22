@@ -1,0 +1,121 @@
+---
+title: "modulo_4_julia_pt"
+author: "Júlia Papa"
+date: "2022-12-21"
+output: html_document
+bibliography: references.bib
+---
+
+# Módulo 4 Randomização
+
+O módulo sobre [inferência causal](https://egap.github.io/theory_and_practice_of_field_experiments/causal-inference.html) discutiu o papel crucial da randomização para extrair inferências válidas de uma comparação de grupos tratados e não tratados. Neste módulo, passamos da teoria para a primeira de muitas escolhas concretas para o seu projeto de pesquisa.
+
+Apresentamos quatro maneiras comuns de randomizar o tratamento -- simples, completo, em bloco e clusterizada -- e quando esses diferentes tipos de randomização podem estar disponíveis e apropriados. Também cobrimos vários experimentos populares, incluindo experimentos fatoriais e experimentos de estímulo. O módulo fornece algumas orientações sobre a implementação, incluindo as melhores práticas para verificar o equilíbrio e garantir a replicabilidade.
+
+## 4.1 Conteúdo Principal
+
+-   O que é **randomização**? Atribuição aleatória **não** é o mesmo que amostragem aleatória.
+
+-   Quatro maneiras comuns de randomizar o tratamento:
+
+    -   **Simples**: aleatoriamente atribuir unidades ao tratamento (como jogar uma moeda).
+
+    -   **Completa**: dentro de uma lista de unidades elegíveis, atribuição de um número fixo para receber um tratamento (como retirar de uma urna).
+
+    -   **Em bloco (ou estratificada)**: atribuir tratamento dentro de estratos ou blocos específicos, como se você estivesse executando um experimento dentro de cada bloco.
+
+    -   **Cluster**: atribuir grupos (clusters) de observações à mesma condição de tratamento.
+
+-   Alguns experimentos populares:
+
+    -   **Acesso** randomizado: randomização para disponiblidade de tratamento.
+
+    -   **Acesso atrasado** randomizado: randomização do tempo de acesso.
+
+    -   **Fatorial**: randomização de unidades para combinações de braços de tratamento.
+
+    -   **Estímulo**: randomização do convite para receber tratamento.
+
+-   Como você verifica se sua randomização produziu equilíbrio nas características observáveis? Normalmente, conduzimos testes de randomização, também conhecidos como testes de equilíbrio, usando o teste omnibus $d^2$ do XBalance no pacote RItools (pois é uma inferência de randomização) ou aproximando o resultado com um teste$-F$
+
+-   Claro que existem **limites para a randomização**. Discutiremos alguns aqui e direcionaremos você para o módulo sobre [ameaça](https://egap.github.io/theory_and_practice_of_field_experiments/threats-to-the-internal-validity-of-randomized-experiments.html) para saber mais.
+
+## 4.2 Slides
+
+Abaixo estão os slides com o conteúdo principal que abordamos em nossa palestra sobre randomização. Você pode usar esses slides diretamente ou fazer sua própria cópia e edição local.
+
+-   R Markdown
+
+-   [Versão em PDF](https://egap.github.io/learningdays-resources/Slides/randomization-slides.pdf)
+
+-   [Versão em HTML](https://egap.github.io/learningdays-resources/Slides/randomization-slides.html#/)
+
+Os arquivos vinculados mostram como fazer uma randomização replicável no R. Você também pode ver mais exemplos de randomização em [10 Pontos para Entender Randomização](https://egap.org/resource/10-things-to-know-about-randomization/).
+
+Você também pode ver os slides usados em outras Jornadas de Aprendizado da rede EGAP.
+
+-   [Apresentação sobre os problemas de desenho da Jornada de Aprendizado da Rede EGAP na Escola Africana de Economia, Abomey-Calavi, junho de 2019 (a primeira seção analisa experimentos de randomização)](https://egap.github.io/learningdays-resources/Slides/Examples/threats-benin.pdf)
+
+-   [Apresentação sobre Randomização da Jornada de Aprendizado da Rede EGAP na Universidade de Los Andes, Bogotá, Abril de 2019](https://egap.github.io/learningdays-resources/Slides/Examples/randomization-bogota.pdf)
+
+-   [Apresentação sobre Randomização da Jornada de Aprendizado da Rede EGAP na Universidade Católica do Uruguai, Montevidéo, Março de 2018](https://egap.github.io/learningdays-resources/Slides/Examples/randomization-montevideo.pdf)
+
+-   [Apresentação sobre Randomização da Jornada de Aprendizado na Cidade de Guatemala, Guatemala, Agosto de 2017](https://egap.github.io/learningdays-resources/Slides/Examples/randomization-guatemala.pdf)
+
+-   [Apresentação sobre Randomização da Jornada de Aprendizado da Rede EGAP em Salima, Malawi, Fevereiro de 2017](https://egap.github.io/learningdays-resources/Slides/Examples/randomization-malawi.pdf)
+
+-   [Apresentação sobre Randomização da Jornada de Aprendizado da Rede EGAP na Universidade Diego Portagels em Santiago, Chile, Maio de 2016](https://egap.github.io/learningdays-resources/Slides/Examples/randomization-santiago.pdf)
+
+## 4.3 Recursos
+
+### 4.3.1 Guias de Método EGAP
+
+-   Guia de Métodos EGAP [10 Pontos para Entender Randomização](https://egap.org/resource/10-things-to-know-about-randomization/)
+
+-   Guia de Métodos EGAP [10 Pontos para Entender Randomização por Cluster](https://egap.org/resource/10-things-to-know-about-cluster-randomization/)
+
+### 4.3.2 Livros, Capítulos e Artigos
+
+-   [Procedimentos operacionais padrão para o laboratório de Don Green na Universidade de Columbia.](https://github.com/acoppock/Green-Lab-SOP) Um conjunto abrangente de procedimentos e regras práticas para conduzir estudos experimentais.
+
+-   Glennerster e Takavarasha, *Running Randomized Evaluations*. O capítulo 2 é sobre randomização.
+
+-   Gerber e Green, *Field Experiments*. Capítulo 2: Inferência Causal e Experimentação.
+
+### 4.3.3 Análise de Política Pública EGAP
+
+*Experimentos fatoriais*
+
+-   [Análise de Política Pública EGAP 57: Como a Mídia influencia as Normas Sociais: Provas do México](https://egap.org/resource/how-media-influence-social-norms-evidence-from-mexico/)
+
+-   [Análise de Política Pública EGAP 58: Responsabilização de baixo para cima funciona?](https://egap.org/resource/does-bottom-up-accountability-work-evidence-from-uganda/)
+
+*Acesso Randomizado*
+
+-   [Análise de Política Pública 24: Reduzindo a Captura de Elite nas Ilhas Salomão](https://egap.org/resource/brief-24-reducing-elite-capture-in-the-solomon-islands/)
+
+*Acesso atrasado randomizado*
+
+-   [Análise de Política Pública 35: Redução de recondenações entre prisioneiros libertados](https://egap.org/resource/brief-35-reducing-reconvictions-among-released-prisoners/)
+
+-   [Análise de Política Pública 60: Reduzindo o apoio de jovens à violência por meio de treinamento e transferências de renda no Afeganistão](https://egap.org/resource/reducing-youth-support-for-violence-through-training-and-cash-transfers-in-afghanistan/)
+
+*Randomização em Cluster*
+
+-   [Análise de Política Pública 22: Incentivando o Voto](https://egap.org/resource/brief-22-getting-out-the-vote/)
+
+*Randomização em Clusters e Blocos*
+
+-   [Análise de Política Pública 54: Revelações sobre os efeitos da má conduta dos políticos locais](https://egap.org/resource/evidence-from-mexico-the-effect-of-incumbent-malfeasance-revelations/)
+
+-   [Análise de Política Pública EGAP 56: Reportando Corrupção](https://egap.org/resource/reporting-corruption-in-nigeria-testing-the-effects-of-norms-nudges/)
+
+### 4.3.4 Ferramentas
+
+-   [RItools](https://cran.r-project.org/web/packages/RItools/index.html), um conjunto de ferramentas para inferência baseada em randomização, incluindo testes de equilíbrio.
+
+### 4.3.5 Vídeos Explicativos Curtos
+
+-   [Randomização vs. Amostragem Aleatória](https://www.youtu.be/02A61b3hxvA)
+
+-   [Randomização por cluster vs. por bloco](https://www.youtu.be/bL2U9z8hX1k)
