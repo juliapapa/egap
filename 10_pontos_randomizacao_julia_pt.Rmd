@@ -1,0 +1,312 @@
+---
+title: "10 Pontos para Entender Randomização"
+author: "Júlia Papa"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# 10 Pontos para Entender Randomização
+
+[In English](https://egap.org/resource/10-things-to-know-about-randomization/)
+
+[En Español](https://egap.org/es/resource/10-cosas-que-debe-saber-sobre-la-aleatorizacion/)
+
+[En Français](https://egap.org/fr/resource/10-choses-a-savoir-sur-la-randomisation/)
+
+Autora: [Lindsay Dolan](https://lindsayrdolan.com/)
+
+-   Abstrato
+
+-   1 Alguns jeitos são melhores do que outros
+
+-   2 Randomização em Blocos: Você pode garantir que os grupos de tratamento e de controle estejam equlibrados
+
+-   3 Experimentos Fatoriais: Você pode randomizar vários tratamentos ao mesmo tempo sem consumir energia
+
+-   4 Você pode randomizar agrupamentos (clusters) inteiros juntos (mas quanto maiores forem seus agrupamentos (clusters), mais fraco tende a ser seu poder)
+
+-   5 Você pode randomizar de uma forma que torne mais fácil ver se há transbordamentos
+
+-   6 Diferentes unidades podem ser designadas para tratamento com diferentes probabilidades
+
+-   7 Randomização Restrita: se você não gostar do resultado, pode recomeçar
+
+-   8 Escreva um código de randomização que permita simular muitas randomizações possíveis
+
+-   9 Você pode randomizar conforme avança
+
+-   10 A randomização às vezes pode ser uma forma ética de atribuir um tratamento, mas às vezes não é
+
+## Abstrato
+
+Este guia irá ajudá-lo a projetar e executar diferentes tipos de randomização em seus experimentos. Nós nos focamos nas grandes ideias e fornecemos exemplos e ferramentas que você pode usar em R. Para saber por que fazer randomização, consulte [este guia de métodos.](https://egap.org/resource/10-strategies-for-figuring-out-if-x-caused-y/)
+
+## 1 Alguns jeitos são melhores que outros
+
+Existem muitas maneiras de randomizar. A mais simples é jogar uma moeda ao ar cada vez que você quiser definir se um determinado sujeito recebe tratamento ou não. Isso garante que cada sujeito tenha uma probabilidade de 0,5 de receber o tratamento e uma probabilidade de 0,5 de não recebê-lo. Desta forma, o fato de um sujeito receber o tratamento não afeta de forma alguma se o próximo sujeito o receberá, todos os sujeitos têm chances iguais de receber o tratamento e ele será independente de todos os fatores de confusão -- pelo menos na expectativa.
+
+Esta não é uma abordagem ruim, mas tem lacunas. Primeiro, usando este método, você não consegue saber com antecedência quantas unidades estarão em tratamento e quantas sob controle. Se você quiser saber isso, você precisa de alguma maneira de fazer seleções para que os diferentes desenhos não sejam estatisticamente independentes uns dos outros (como tirar nomes de um chapéu). Em segundo lugar, você pode querer afirmar o controle sobre a parcela exata de unidades designadas para tratamento e controle. Isso é difícil de fazer com uma moeda. Terceiro, você pode querer ser capaz de replicar sua randomização para mostrar que não houve nenhuma trapaça. Isso é difícil de fazer com moedas e chapéus. Finalmente, como mostramos a seguir, existem várias maneiras de fazer randomização para melhorar o poder e garantir o equilíbrio de várias maneiras que são muito difíceis de conseguir usando moedas e chapéus.
+
+Felizmente, porém, a randomização replicável flexível é muito fácil de fazer com software disponível gratuitamente. O seguinte código em R pode, por exemplo, ser usado para gerar uma atribuição aleatória, especificando o número de unidades a serem tratadas. Aqui, N (100) é o número de unidades que você possui e m (34) é o número que deseja tratar. A "semente" permite replicar o mesmo sorteio cada vez que você executar o código (ou você pode alterar a semente para um sorteio diferente).[^1] [^2]
+
+[^1]: Os geradores de números aleatórios são, na verdade, pseudoaleatórios, porque eles geram um vetor de números aleatórios com base em um pequeno conjunto de valores iniciais, conhecido como estado inicial. Os geradores de números aleatórios operam dessa maneira para melhorar a velocidade computacional. No entanto, a série de números aleatórios gerada é tão aleatória quanto você precisa para fins de atribuição aleatória, porque não está totalmente relacionada aos resultados potenciais de seus participantes.
+
+[^2]: Todos os códigos são atualizados por Alex Coppock em 25 de novembro de 2020.
+
+```{r 1, echo=FALSE, message = FALSE, warning= FALSE}
+library(randomizr)
+set.seed(343)
+complete_ra(N = 100, m = 34)
+```
+
+## 2 Randomização em Blocos: Você pode garantir que os grupos de tratamento e de controle estejam equlibrados
+
+É possível, ao randomizar, especificar o equilíbrio de fatores específicos com os quais você se preocupa entre os grupos de tratamento e controle, mesmo que não seja possível especificar quais unidades específicas são selecionadas para cada grupo.
+
+Por exemplo, você pode especificar que os grupos de tratamento e controle contenham proporções iguais de homens para mulheres. Ao fazer isso, você evita qualquer randomização que possa produzir um grupo de tratamento distintamente masculino e um grupo de controle distintamente feminino, ou vice-versa.
+
+Por que isso é desejável? Não porque nossa estimativa do efeito médio do tratamento seria tendenciosa, mas porque poderia ser muito ruidosa. Suponha que uma atribuição aleatória tenha gerado um grupo de tratamento muito masculino e um grupo de controle muito feminino. Observaríamos uma correlação entre sexo e status de tratamento. Se fôssemos estimar um efeito do tratamento, esse efeito do tratamento ainda seria imparcial porque o gênero não causou o status do tratamento. No entanto, seria mais difícil rejeitar a hipótese nula de que não era nosso tratamento, mas o gênero que estava produzindo o efeito. Em suma, o desequilíbrio produz uma estimativa ruidosa, o que torna mais difícil para nós termos confiança em nossas estimativas.
+
+A randomização em bloco (às vezes chamada de estratificada) nos ajuda a preparar nosso experimento para que nossos grupos de tratamento e controle sejam equilibrados em dimensões importantes, mas ainda sejam atribuídos aleatoriamente. Essencialmente, esse tipo de design de randomização constrói vários mini-experimentos: por exemplo, pode escolher o grupo mulheres e atribuir aleatoriamente metade ao tratamento e metade ao controle e, em seguida, designar metade dos homens ao tratamento e metade ao controle. Isso garante um equilíbrio de gênero quando os grupos de tratamento e controle são agrupados.
+
+Outra vantagem da randomização de blocos é que ela garante que seremos capazes de estimar os efeitos do tratamento para subgrupos de interesse. Por exemplo, imagine que estamos interessados ​​em estimar o efeito do tratamento entre as mulheres. Se não bloquearmos o gênero, podemos, por acaso, acabar com uma atribuição aleatória que coloca apenas algumas mulheres no grupo de tratamento. Nossa estimativa do efeito do tratamento entre as mulheres seria muito ruidosa. No entanto, se atribuirmos o tratamento separadamente entre as mulheres e entre os homens, podemos garantir que teremos mulheres suficientes, respectivamente, no grupo de tratamento e controle para obter uma estimativa precisa desse subgrupo.
+
+O [pacote blockTools](https://cran.r-project.org/web/packages/blockTools/index.html) é um pacote útil para conduzir a randomização de blocos. Vamos começar gerando um conjunto de dados falsos para 60 indivíduos, 36 dos quais são homens e 24 são mulheres.
+
+Suponha que gostaríamos de bloquear o gênero. Com base em nossos dados, o blockTools gerará os menores blocos possíveis, cada um um agrupamento de duas unidades do mesmo gênero, uma das quais será atribuída ao tratamento e outra ao controle.
+
+```{r 2, echo=FALSE, message = FALSE, warning= FALSE}
+rm(list = ls())
+library(blockTools)
+library(dplyr)
+library(randomizr)
+dat <-
+  tibble(
+    id = seq(1:60),
+    female = c(rep(0, 36), rep(1, 24)),
+    age = sample(18:65, size = 60, replace = TRUE)
+  )
+# um bloco de covariadas
+dat <-
+  dat %>%
+  mutate(Z_block_1 = block_ra(female))
+with(dat, table(female, Z_block_1))
+# grupos de 4 combinados
+out <- block(dat, n.tr = 4, id.vars = "id", 
+             block.vars = c("female", "age"))
+dat <-
+  dat %>%
+  mutate(
+    block_id = createBlockIDs(out, dat, id.var = "id"),
+    Z_block_2 = block_ra(block_id))
+with(dat, table(Z_block_2, block_id))
+```
+
+Você pode verificar a média da variável na qual você bloqueou para tratamento e controle para ver se os grupos de tratamento e controle estão, de fato, perfeitamente equilibrados por gênero. Contudo o pacote \`\`\``blockTools`\`\`\` não existe mais.
+
+## 3 Experimentos Fatoriais: Você pode randomizar vários tratamentos ao mesmo tempo sem consumir energia
+
+Suponha que haja vários componentes de um tratamento que você deseja testar. Por exemplo, você pode querer avaliar o impacto de um programa de microfinanças. Dois tratamentos específicos podem ser emprestar dinheiro às mulheres e fornecê-las treinamento. Um experimento fatorial considera todas as combinações possíveis desses tratamentos: (1) Empréstimos, (2) Treinamento, (3) Empréstimos + Treinamento e (4) Controle. Os indivíduos são então atribuídos aleatoriamente a uma dessas quatro condições.
+
+![](images/paste-41DEEED1.png)
+
+Os experimentos fatoriais são especialmente úteis ao avaliar intervenções que incluem um pacote de tratamentos. Como no exemplo acima, muitas intervenções de desenvolvimento vêm com vários braços e, às vezes, é difícil dizer quais braços estão produzindo o efeito observado. Um experimento fatorial separa esses diferentes tratamentos e também nos permite ver a interação entre eles.
+
+O código seguinte mostra como randomizar um experimento fatorial.
+
+```{r 3, echo=FALSE, message = FALSE, warning= FALSE}
+
+dat <-
+  tibble(
+    Z_loan = complete_ra(80, 40),
+    Z_training = block_ra(blocks = Z_loan)
+  )
+with(dat, table(Z_loan, Z_training))
+```
+
+## 4 Você pode randomizar agrupamentos (clusters) inteiros juntos (mas quanto maiores forem seus agrupamentos (clusters), mais fraco tende a ser seu poder)
+
+Às vezes é impossível randomizar no nível do indivíduo. Por exemplo, um apelo de rádio para levar indivíduos a um posto de votação deve ser inerentemente transmitido para todo o mercado de mídia; é impossível transmitir apenas para alguns indivíduos, mas não para outros. Quer seja por necessidade ou por escolha, às vezes você irá randomizar agrupamentos (clusters) ao invés de indivíduos.
+
+A desvantagem da randomização de agrupamentos (clusters) é que ela reduz seu poder, já que o número de unidades atribuídas aleatoriamente agora reflete o número de agrupamentos (clusters) e não simplesmente o número total de assuntos. Se sua amostra consistir em dois grupos de 1.000 indivíduos cada, o número funcional de unidades pode estar mais próximo de 2, não de 2.000. Por esta razão, é preferível fazer agrupamentos (clusters) do menor tamanho possível.
+
+O grau em que o agrupamento (cluster) reduz seu poder depende da extensão em que as unidades no mesmo agrupamento se assemelham. É desejável ter heterogeneidade dentro de seus agrupamentos (clusters) para que sejam tão representativos quanto possível de sua população mais ampla. Se os indivíduos dentro dos agrupamentos (clusters) forem muito semelhantes entre si, eles podem ter resultados potenciais parecidos, o que significa que grupos de indivíduos com resultados potenciais semelhantes serão todos designados para tratamento ou controle juntos. Se um agrupamento (cluster) tiver resultados potenciais particularmente altos ou baixos, esse procedimento de atribuição aumentará a correlação geral entre os resultados potenciais e a atribuição do tratamento. Como resultado, suas estimativas se tornam mais variáveis. Em resumo, se seus clusters forem mais representativos da população mais ampla, suas estimativas do efeito médio do tratamento serão mais precisas. Consulte nosso guia sobre [randomização de agrupamento (cluster)](https://egap.org/resource/10-things-to-know-about-cluster-randomization/) para obter mais detalhes.
+
+Uma pergunta frequente é como a randomização de agrupamento (cluster) difere da randomização de bloco. A randomização de blocos é conduzida para alcançar o equilíbrio com base nas covariáveis ​​pré-tratamento. Por exemplo, uma intervenção educacional pode randomizar em blocos as pontuações dos testes do ano anterior para acompanhar o progresso de alunos de baixo e alto desempenho. A randomização de agrupamento (cluster) é quando várias unidades são tratadas como um grupo -- todas recebem tratamento ou status de controle juntas. Por exemplo, a mesma intervenção educacional pode ser randomizada no nível da sala de aula, de modo que as salas de aula constituem os agrupamentos (clusters). É possível, simultaneamente, bloquear e agrupar (clusterizar) aleatoriamente. Em nosso exemplo, você pode calcular a pontuação média do teste para cada sala de aula e bloquear aleatoriamente com base na pontuação média da sala de aula.
+
+O gráfico a seguir demonstra como seus dados podem parecer nos casos de randomização de bloco, agrupamento (cluster) e bloco + agrupamento (cluster), em relação a um caso simples de randomização sem bloqueio ou agrupamento (clusterização). O exemplo imagina que realizamos um experimento em quatro escolas, onde cada escola contêm quatro salas de aula com quatro alunos em cada sala. O painel superior esquerdo representa a atribuição aleatória simples. Observe que o número de alunos atribuídos ao tratamento (quadrilhos sombreados em azul) varia entre as escolas. Por exemplo, na escola 1, 9 alunos recebem tratamento, mas na escola 4, o grupo de tratamento contêm apenas 6 alunos. O painel superior direito representa um procedimento de atribuição aleatória que usa escolas como blocos. Esse procedimento garante que exatamente oito alunos sejam encaminhados para tratamento em cada escola. O painel inferior esquerdo mostra a atribuição aleatória do agrupamento (cluster). A ideia é que os quatro alunos de cada quadrante de uma escola estejam na mesma sala de aula, e alocamos salas inteiras para tratamento. Observe novamente que, como não há bloqueio envolvido, o número de salas de aula destinadas ao tratamento varia entre as escolas. Por exemplo, a escola 1 designa três salas de aula para tratamento enquanto a escola 3 designa todas as salas de controle. Por fim, o painel inferior direito corresponde à tarefa bloqueada pela escola e agrupada (clusterizada) por sala de aula. O bloqueio garante que exatamente duas salas de aula por escola sejam destinadas ao tratamento.
+
+```{r 4, echo = FALSE, message=F, fig.height=7.5, fig.width=7.5, fig.cap="Illustration of patterns of assignments you might see under different types of blocked and clustered designs. (Colors indicate treatment assignment)", fig.align='center'}
+
+library(ggplot2)
+library(gridExtra)
+library(randomizr)
+library(magrittr)
+library(dplyr)
+library(tibble)
+library(tidyverse)
+set.seed(123456789)
+data <- data.frame(studentID = rep(1:16, 4),
+                   placementIDy = rep(rep(c(1,1,2,2,3,3,4,4), 2),4),
+                   placementIDx = rep(c(rep(1:2, 4), rep(3:4, 4)), 4),
+                   classroomID = rep(1:16, each = 4),
+                   schoolID = rep(c(1,2,3,4), each = 16),
+                   schoolID_label = rep(c("Escola 1", "Escola 2", "Escola 3", "Escola 4"), each = 16), 
+                   Z_simple = simple_ra(N = 16*4, conditions = c("Tratamento", "Controle")))
+data <- data %>%
+  mutate(Zblock = block_ra(blocks = schoolID, m = 8, 
+                           conditions = c("Tratmento", "Controle")),
+         Zcluster =  cluster_ra(clusters = classroomID, 
+                                conditions = c("Tratamento", "Controle")),
+         Zblock_cluster =  block_and_cluster_ra(blocks = schoolID,
+                                                clusters = classroomID, 
+                                                conditions = c("Tratamento", "Controle")))
+             
+simple <- data %>% ggplot(aes(x = as.factor(placementIDx), y = as.factor(placementIDy), fill = as.factor(Z_simple))) + 
+  geom_tile(colour = "white") + 
+  facet_wrap(. ~ as.factor(schoolID_label))  +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank(),
+        text = element_text(size=8),
+        axis.text = element_text(size=5),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5)) + labs(title="Simples", x="", y = "")
+block <- data %>% ggplot(aes(x = as.factor(placementIDx), y = as.factor(placementIDy), fill = as.factor(Zblock))) + 
+  geom_tile(colour = "white") + 
+  facet_wrap(. ~ as.factor(schoolID_label)) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank(),
+        text = element_text(size=8),
+        axis.text = element_text(size=5),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5)) +  labs(title="Bloco", x="", y = "")
+cluster <- data %>% ggplot(aes(x = as.factor(placementIDx), y = as.factor(placementIDy), 
+                    fill = as.factor(Zcluster))) + 
+  geom_tile(colour = "white") + 
+  facet_wrap(. ~ as.factor(schoolID_label)) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank(),
+        text = element_text(size=8),
+        axis.text = element_text(size=5),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5)) + labs(title="Cluster", x="", y = "") 
+block_cluster <- data %>% ggplot(aes(x = as.factor(placementIDx), y = as.factor(placementIDy), fill = as.factor(Zblock_cluster))) + 
+  geom_tile(colour = "white") + 
+  facet_wrap(. ~ as.factor(schoolID_label)) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank(),
+        text = element_text(size=8),
+        axis.text = element_text(size=5),
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5)) + labs(title="Bloco e Cluster", x="", y = "") 
+grid.arrange(simple, block, cluster, block_cluster, nrow = 2, ncol = 2)
+```
+
+Ilustração de padrões de atribuições em que você pode ver em diferentes tipos de designs bloqueados e agrupados (clusterizado). (As cores indicam a atribuição do tratamento)
+
+## 5 Você pode randomizar de uma forma que torne mais fácil ver se há transbordamentos
+
+Ao projetar seu experimento, pense criticamente se os "transbordamentos" representam uma ameaça à sua capacidade de identificar o efeito causal do seu tratamento. Os transbordamentos surgem se o resultado de uma unidade for afetado pelo status do tratamento de outra unidade. Isso pode ser complicado se as unidades tiverem a capacidade de interagir umas com as outras: um membro de uma aldeia pode saber que outro aldeão recebeu uma doação em dinheiro e pode mudar seu comportamento de acordo.
+
+Uma maneira de tornar os transbordamentos mais evidentes é usar a randomização dupla. Você primeiro atribuiria aleatoriamente alguns agrupamentos (clusters) para tratamento e outros para controle e, dentro dos agrupamentos (clusters) , atribuiria alguns indivíduos ao tratamento e outros ao controle. A comparação de indivíduos de controle em seu agrupamento (cluster) de tratamento com indivíduos em seu agrupamento (cluster) de controle permitirá que você avalie o papel dos transbordamentos em seu experimento.
+
+## 6 Diferentes unidades podem ser designadas para tratamento com diferentes probabilidades
+
+Às vezes, as pessoas pensam que "aleatório" significa que dois eventos são igualmente prováveis, mas, na verdade, a atribuição aleatória é "aleatória" desde que a probabilidade de atribuição ao tratamento esteja estritamente entre 0 e 1. Se um sujeito tiver 0 ou 100 por cento de chance de ser designado para o tratamento, esse sujeito deve ser excluído de sua análise experimental porque não está ocorrendo randomização. Entretanto, todos os sujeitos com probabilidade de atribuição ao tratamento estritamente entre 0 e 1 podem ser incluídos, mesmo que suas probabilidades sejam diferentes, desde que suas probabilidades sejam conhecidas.
+
+Por que você desejaria atribuir diferentes probabilidades de atribuição ao tratamento? Suponha que você esteja trabalhando com um parceiro de implementação para randomizar a alocação de observadores eleitorais para medir o efeito sobre a fraude eleitoral. Seu parceiro de implementação pode enviar apenas alguns observadores eleitorais para uma parte rural do país. Você pode lidar com essa restrição bloqueando a área geográfica e atribuindo uma maior probabilidade de atribuição de tratamento os vilarejos mais próximos, para as quais é menos custoso viajar. Desde que a probabilidade de atribuição de tratamento para vilarejos mais acessíveis seja menor que 1, a probabilidade de atribuição de tratamento para vilarejos menos acessíveis seja maior que zero e essas probabilidades sejam conhecidas, é possível estimar o efeito do tratamento.
+
+Quando os sujeitos têm probabilidades diferentes de atribuição ao tratamento, no entanto, você não pode mais simplesmente mesclar todos os sujeitos na análise de seus dados. Se o fizer, a atribuição do tratamento será correlacionada com as características de contexto nas quais você bloqueou. Existem duas maneiras de lidar com isso.
+
+A primeira maneira é estimar o efeito médio do tratamento bloco por bloco e, em seguida, calcular a média dos efeitos do tratamento, cada um ponderado pelo tamanho do bloco em relação à amostra inteira.
+
+A segunda maneira é a ponderação de probabilidade inversa (IPW). No IPW, os pesos são definidos como $1/p$ para unidades tratadas e $1/(1-p)$ para unidades de controle, onde p se refere à probabilidade de atribuição ao tratamento. Este método permite que você execute uma regressão ponderada de seu resultado na atribuição de tratamento.
+
+```{r 5, echo=FALSE, message = FALSE, warning= FALSE}
+
+N <- 100000
+dat <- tibble(Y0 = 1:N,
+              Y1 = Y0 + 10000)
+dat <-
+  dat %>%
+  mutate(
+    p = seq(0.25, 0.75, length.out = N),
+    Z = simple_ra(N, prob_unit = p),
+    Y = Z * Y1 + (1 - Z) * Y0)
+  
+dat %>%
+  summarise(
+    naive_estimate = mean(Y[Z == 1]) - mean(Y[Z == 0]),
+    ipw_estimate = weighted.mean(Y[Z == 1], 1 / p[Z == 1]) -
+      weighted.mean(Y[Z == 0], 1 / (1 - p[Z == 0]))
+  )
+
+```
+
+## 7 Randomização Restrita: se você não gostar do resultado, pode recomeçar
+
+Às vezes, você pode querer ter certeza de que a randomização não produz tipos específicos de padrão (por exemplo, muitas pessoas que se conhecem, todas em tratamento). Mas os padrões de que você gosta podem ser muito difíceis de configurar com antecedência. O que você pode fazer é fazer um sorteio aleatório e verificar se o sorteio atende aos critérios de seu interesse. Se não, desenhe novamente. Esteja avisado, porém, que se você fizer isso, criará algumas complicações: (1) cada unidade não será necessariamente designada para o tratamento com a mesma probabilidade, (2) as unidades podem não ser designadas independentemente para o tratamento. Você precisa levar em conta esses dois fatos em sua análise. Você pode fazer isso gerando pesos de probabilidade inversa, como fizemos no ponto 6. Aqui, você precisará usar o mesmo código de randomização restrita que usou para atribuir o tratamento para descobrir a probabilidade de cada sujeito receber tratamento sob essas restrições. Você simplesmente executa o código um grande número de vezes e calcula a proporção de vezes que uma determinada unidade é atribuída ao tratamento em todas as repetições. Em seguida, você usa a distribuição de possíveis atribuições de tratamento para implementar a inferência de randomização. Essas análises são complexas, portanto prossiga com cautela.
+
+## 8 Escreva um código de randomização que permita simular muitas randomizações possíveis
+
+Um benefício de usar R para randomizar é que você pode executar milhares de randomizações possíveis em segundos. Por que isso é benéfico?
+
+1.  Pode ser uma forma útil de verificar se o seu código de randomização funcionou. Por exemplo, se um ou mais sujeitos em seu experimento nunca receberam tratamento em 10.000 atribuições aleatórias possíveis, você suspeitaria de uma falha em seu código de randomização.
+
+2.  Você pode usar a re-randomização para calcular a probabilidade exata de atribuição de tratamento para cada indivíduo em seu experimento. Isso é especialmente útil se o código de randomização for mais complexo. Talvez você empregue a randomização de blocos e agrupamentos (clusters) ou um procedimento de randomização restrito, resultando em probabilidades de atribuição de tratamento que variam muito entre os indivíduos em um grande experimento. Essas probabilidades seriam difíceis de calcular manualmente, mas uma solução fácil é executar seu código de randomização original várias vezes e gerar uma variável que represente a proporção de vezes que cada indivíduo foi designado para o tratamento: isso representa sua probabilidade individual de designação para o tratamento. O inverso dessa variável pode então ser usado em uma regressão ponderada ao estimar o efeito médio do tratamento.
+
+3.  A simulação de possíveis randomizações é uma abordagem baseada em desenhos experimentais para calcular a significância estatística. Essa abordagem, chamada de inferência de randomização, gera um $p$-valor exato calculando os possíveis efeitos médios do tratamento que seriam observados sob atribuições aleatórias hipotéticas se de fato o tratamento não tivesse efeito. O $p$-valor é então a proporção dos efeitos de tratamento estimados que é pelo menos tão grande em magnitude quanto aquele que seu experimento observou. A inferência de randomização evita fazer suposições distributivas e, em vez disso, usa a distribuição de dados observados em seu experimento. Essa abordagem é preferível a cálculos padrão de significância estatística quando a distribuição amostral não é normal -- um problema que é mais provável de surgir quando sua amostra experimental é pequena e quando seus resultados não seguem uma distribuição normal. Para obter mais informações sobre inferência de randomização, incluindo código de amostra, visite o guia metodológico [10 Ponto Para Entender inferência de randomização.](https://egap.org/resource/10-things-to-know-about-randomization-inference/)
+
+## 9 Você pode randomizar conforme avança
+
+Em muitos experimentos, você pode não conhecer toda a sua amostra no início do experimento; alguns assuntos podem se juntar ao longo do tempo. Isso apresenta uma complicação quando queremos usar um algoritmo de bloqueio simples porque a adição de sujeitos ao nosso pool pode alterar a composição de nossos blocos e, portanto, suas probabilidades de atribuição ao tratamento.
+
+Para manter a capacidade de bloqueio e, portanto, a capacidade de afirmar o controle sobre o equilíbrio entre os grupos de tratamento e controle, você pode usar covariáveis ​​para calcular a similaridade de um novo sujeito com outros atribuídos anteriormente e atribuir o novo sujeito à condição de tratamento com menos unidades semelhantes. [^3] [^4]
+
+[^3]: Para saber mais, consulte Moore, Ryan T. e Sally A. Moore. "Blocking for sequential political experiments." Political Analysis 21.4 (2013): 507-523
+
+[^4]: Para uma explicação mais detalhada sobre os procedimentos de randomização disponíveis no pacote do R `randomizr` , consulte: <https://declaredesign.org/r/randomizr/articles/randomizr_vignette.html>
+
+## 10 A randomização às vezes pode ser uma forma ética de atribuir um tratamento, mas às vezes não é
+
+A randomização é o ingrediente chave para isolar o efeito causal de um tratamento de uma perspectiva de desenho de pesquisa, mas também é importante considerar as implicações éticas da randomização. Quando pensamos nos efeitos de longo prazo de um experimento, a randomização permite testar quais programas são mais eficazes para que os recursos possam ser direcionados para programas que façam mais diferença na vida das populações futuras. A curto prazo, randomizar o acesso a um programa (em vez de distribuir com base em características arbitrárias) pode ser uma forma particularmente ética de distribuir bens escassos que não podem ser estendidos a todos.
+
+Porém, às vezes, são as populações mais carentes que precisam ser atendidas por uma intervenção em um desenho experimental. Um projeto aleatório que trata números iguais de participantes de baixa renda e de alta renda com empréstimos está permitindo que os recursos fluam para menos, em vez de para mais indivíduos carentes. Se acreditarmos que há efeitos benéficos do empréstimo, então isso levanta preocupações sobre a ética de alocar recursos longe dos mais necessitados. Seria necessário um forte argumento para os benefícios sociais da pesquisa e também buscar desenhos experimentais que forneçam benefícios fundamentalmente em grupos de controle.[^5]
+
+[^5]: Mas se temos certeza dos efeitos do empréstimo, também não está claro por que estamos realizando um experimento para testá-lo. Na pesquisa médica, os testes controlados randomizados geralmente param se ficar claro desde o início que um medicamento está, sem dúvida, curando doenças potencialmente fatais e, portanto, retê-lo de indivíduos de controle é perigoso. (Da mesma forma, um estudo também seria interrompido se ficasse claro desde o início que um medicamento está indubitavelmente causando efeitos negativos e nocivos.)
+
+Um desenho de randomização de uma lista de espera é uma maneira de tratar todo um grupo de assuntos, permitindo que o pesquisador teste a eficácia do tratamento experimentalmente. Nesse desenho, o programa poderia desenvolver a intervenção em fases e atribuir aleatoriamente as unidades à fase em que serão tratadas. Por exemplo, se um programa quisesse tratar 90 vilarejos no total, poderia tratar 30 vilarejos por ano e medir os resultados no final de cada ano. Se você quisesse comparar os resultados em vilarejos de tratamento e controle, você compararia as 30 aldeias tratadas com as 60 vilarejos ainda não tratadas no final do primeiro ano. No final do segundo ano, você pode comparar os 30 vilarejos que foram tratados no ano anterior com os 30 vilarejos que ainda não foram tratados. Essencialmente, isso cria dois experimentos, idênticos, mas pelo tempo do ano que os separa. Na tabela abaixo, você pode ver que, no primeiro ano, pudemos comparar o grupo de tratamento azul escuro com os dois grupos de controle azul claro. No segundo ano, poderíamos comparar o grupo de tratamento com vermelho escuro ao grupo de tratamento com vermelho claro, mas gostaríamos de evitar o agrupamento dos dois grupos de tratamento porque um foi tratado por mais tempo que o outro. Você pode ver que após o terceiro ano, não é possível fazer mais comparações porque todas as unidades foram tratadas:
+
+![](images/paste-87F68D58.png)
+
+O único requisito é que a designação de um sujeito para tratamento em uma fase específica seja atribuída aleatoriamente e não relacionada aos seus possíveis resultados de interesse. Um projeto no qual participantes mais ansiosos receberam tratamento mais cedo violaria essa suposição e não produziria uma estimativa imparcial do efeito do tratamento, pois fatores não observados que os predispõem a procurar tratamento podem estar influenciando seu plano de possíveis resultados. O desenho da lista de espera é um exemplo de desenho de randomização criativa que pode abordar questões éticas sobre a limitação da distribuição de um tratamento valioso.
+
+A ética costuma estar altamente entrelaçada com desenhos randomizados, especialmente em ciências sociais e pesquisa médica. Como pesquisador, você deve considerar cuidadosamente as possíveis implicações de randomizar qualquer tratamento. Você também precisará solicitar aprovação para seu projeto de pesquisa do Conselho de Revisão Institucional (IRB) de sua instituição de pesquisa.
