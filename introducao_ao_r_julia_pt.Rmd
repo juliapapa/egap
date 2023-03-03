@@ -1,0 +1,233 @@
+---
+title: "Introdução ao R e ao RStudio"
+author: "Júlia Papa"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## B Introdução ao R e ao RStudio
+
+Ao longo do livro, incluímos códigos em R para estimação, simulação e criação de exemplos. Usamos o RStudio para criar os slides. Para personalizá-los para seu próprio propósito, presumimos que você usará o R Markdown. Abaixo, incluímos guias para configurar o R e o RStudio em sua máquina, bem como alguns comandos básicos que são usados ​​com frequência.
+
+### B.1 R e RStudio
+
+O R é um ambiente de software livre mais comumente usado para análise estatística e computação. Como os participantes das Jornadas de Aprendizado chegam com diferentes formações estatísticas e software estatístico preferido, usamos R para garantir que todos estejam na mesma página. Defendemos o uso de R de forma mais geral por sua flexibilidade, riqueza de aplicativos e suporte abrangente principalmente por meio de fóruns online.
+
+O RStudio é um ambiente de desenvolvimento integrado de código aberto gratuito com uma interface de usuário que torna o R muito mais amigável. R Markdown, um recurso do RStudio, permite a geração fácil de código, resultados e texto em formato .pdf, .html ou .doc.
+
+### B.2 Baixando o R e o RStudio
+
+#### B.2.1 Baixando o R
+
+O R pode ser baixado gratuitamente do CRAN no link correspondente ao seu sistema operacional:
+
+-   Para **Windows**: <https://cran.r-project.org/bin/windows/base/>
+
+-   Para **Mac OS X**: <https://cran.r-project.org/bin/macosx/>
+
+    -   Selecione `R-4.2.1.pkg` para OS X 10.13 e superior.
+
+    -   Selecione `R-3.6.3.nnpkg` para OS X 10.11-10.12.
+
+    -   Selecione `R-3.3.3.nnpkg` para OS X 10.19-10.10.
+
+    -   Selecione `R-3.2.1-snowleopard.pkg` para OS X 10.6-10.8.
+
+### B.2.2 Baixando o RStudio
+
+O RStudio pode ser baixado gratuitamente no site do RStudio, <https://www.rstudio.com/products/rstudio/download/.> Na tabela, clique no botão azul `Download` na parte superior da coluna esquerda, "RStudio Desktop Open Source License" conforme ilustrado abaixo na Figura B.1. Depois de selecionar este botão, a página irá pular para uma lista de opções de download, conforme ilustrado na Figura B.2.
+
+-   Para **Windows**, selecione `Windows 10/8/7`.
+
+-   Para **Mac OS X**, selecione `Mac OS X 10.13+`.
+
+![Figura B.1: Selecione Download na coluna "RStudio Desktop Open Source License"](https://egap.github.io/theory_and_practice_of_field_experiments/Images/new_rstudio.png)
+
+![Figura B.2: Selecione o link 'Windows 10/8/7' para Windows ou o link 'Mac OS X 10.13+' para Mac](https://egap.github.io/theory_and_practice_of_field_experiments/Images/rstudio_download.png)
+
+## B.3 Interface do RStudio
+
+Quando você abre o RStudio pela primeira vez, deve haver três painéis visíveis, conforme ilustrado na Figura B.3 abaixo.
+
+-   Console (painel esquerdo)
+
+-   Accounting (painel superior direito): inclui as guias Environment e Histórico
+
+-   Diversos (painel inferior direito)
+
+![Figura B.3: Quando você abre o RStudio, há três painéis visíveis: Console (esquerda), Console (canto superior direito) e Diversos (canto inferior direito).](https://egap.github.io/theory_and_practice_of_field_experiments/Images/rstudio_intro.png)
+
+### B.3.1 Console
+
+Você pode executar todas as operações no console. Por exemplo, se você inserir `4 + 4`e pressionar a tecla Enter/Return, o Console retornará `[1] 8`.
+
+Para garantir que todos estejam preparados para usar o R durante as Jornadas de Aprendizado, pedimos aos participantes que executem uma linha de código no Console para baixar vários pacotes do R. Os pacotes são fragmentos de código reproduzível que permitem uma análise mais eficiente em R. Para executar essas linhas, copie o código a seguir no Console e pressione a tecla `Return/Enter`. Você deve estar conectado à internet para baixar os pacotes.
+
+```{r 1, eval = FALSE}
+install.packages(c("ggplot2", "dplyr", "AER", "arm", "MASS", "sandwich", "lmtest", "estimatr","coin","randomizr", "DeclareDesign"))
+```
+
+Se o download for bem-sucedido, seu Console se parecerá com a Figura B.4, exceto que os URLs serão diferentes dependendo de sua localização.
+
+![Figura B.4: Uma imagem do Console após a execução das linhas de código listadas acima.](https://egap.github.io/theory_and_practice_of_field_experiments/Images/console2a.png)
+
+### B.3.2 Editor
+
+Para escrever e salvar um código reproduzível, abriremos um quarto painel, o Editor, clicando no ícone com uma página branca com um sinal de mais (+) no canto superior esquerdo da interface do RStudio e selecionando R Script, conforme ilustrado na Figura B.5.
+
+![Figura B.5: Crie um novo script R e abra o painel do editor selecionando `R Script`´ no menu suspenso.](https://egap.github.io/theory_and_practice_of_field_experiments/Images/new_script.png)
+
+Uma vez aberto o script R, devem existir quatro painéis dentro da interface do RStudio, agora com a adição do painel Editor. Podemos executar aritmética simples inserindo uma fórmula no editor e pressionando `Control + Enter` (Windows) ou `Command + Enter` (Mac). A fórmula e a "resposta" aparecerão no Console, conforme ilustrado na Figura B.6, com caixas vermelhas adicionadas para dar ênfase.
+
+![Figura B.6: Uma expressão aritmética é inserida no editor e avaliada no console. As caixas vermelhas são adicionadas para dar ênfase.](https://egap.github.io/theory_and_practice_of_field_experiments/Images/first_addition.png)
+
+R pode ser usado para qualquer operação aritmética, incluindo, entre outros, adição ( `+`), subtração ( `-` ), multiplicação escalar ( `*` ), divisão ( `/` ) e exponenciação ( `^` ).
+
+### B.3.3 Accounting
+
+Além das funções básicas, também podemos armazenar valores, dados e funções no ambiente global. Para atribuir um valor a uma variável, use o operador `<-`. Todos os valores armazenados, funções e dados aparecerão na guia Environment no painel de Contabilidade. Na Figura B.7, definimos a variável `t` para assumir o valor $3\times \frac{6}{14}$ e podemos ver que ela é armazenada em Valores (Data).
+
+Também carregamos um conjunto de dados. Aqui, "ChickWeight" é um conjunto de dados incorporado no R; a maioria dos conjuntos de dados será carregada da web ou de outros arquivos em seu computador por meio de um método alternativo. Podemos ver que o ChickWeight contém 578 observações de 4 variáveis e é armazenado no Ambiente (Environment). Ao clicar no nome ChickWeight, uma guia será aberta com o conjunto de dados em sua janela do Editor.
+
+![Figura B.7: O valor 3 \* (6/14) é atribuído à variável t (em vermelho) e o conjunto de dados ChickWeight é adicionado ao ambiente global (em azul). As caixas são adicionadas para enfatizar.](https://egap.github.io/theory_and_practice_of_field_experiments/Images/save_data.png)
+
+Os workshops das Jornadas de Aprendizado utilizam muitas ferramentas no R para analisar e visualizar dados. Por enquanto, podemos aprender algumas ferramentas básicas para examinar os dados. A função `head()` nos permite ver as primeiras seis linhas do conjunto de dados. `summary()` resume cada uma das colunas do conjunto de dados e `dim()` fornece as dimensões do conjunto de dados, com primeiro o número de linhas e depois as colunas.
+
+```{r 1, warning = F, message = F}
+head(ChickWeight) # 6 primeiras observações no dataset
+```
+
+```{r 2, warning = F, message = F}
+summary(ChickWeight) # Resumo de todas as variáveis
+```
+
+```{r 3, warning = F, message = F}
+dim(ChickWeight) # Dimensões do dataset em linhas e colunas
+
+```
+
+Diferente de outros softwares estatísticos, o R permite aos usuários armazenar múltiplos conjuntos de dados, possivelmente de dimensões diferentes, simultaneamente. Essa característica torna o R bastante flexível para análise usando múltiplos métodos.
+
+### B.3.4 Diversos
+
+R fornece um conjunto de ferramentas, variando de funções de plotagem integradas a pacotes de dados gráficos, modelos, estimativas, etc. O painel Diversos final permite a visualização rápida de gráficos no RStudio. A Figura B.8 mostra um gráfico neste painel. As Jornadas de Aprendizado discutirão como plotar dados; por enquanto, não se preocupe com a representação gráfica do código no Editor.
+
+![Figura B.8: Um gráfico de exemplo dos dados `ChickWeight` feitos em R.](https://egap.github.io/theory_and_practice_of_field_experiments/Images/graph.png)
+
+## B.4 Aprendendo a usar o R
+
+### B.4.1 Recursos Online
+
+Existem muitos recursos online úteis para ajudá-lo a começar a aprender R. Recomendamos duas fontes:
+
+-   Code School, que roda inteiramente no seu navegador <https://www.codeschool.com/courses/try-r>.
+
+-   Coursera, por meio de um curso de programação R online organizado pela Johns Hopkins University:
+
+    i.  Vá em [https://www.coursera.org](https://www.coursera.org/)
+
+    ii. Crie uma conta (isso é gratuito!)
+
+    iii. Inscreva-se para R Programming na Johns Hopkins University (instrutor: Roger Peng) na guia "Cursos"
+
+    iv. Leia os materiais e assista aos vídeos da primeira semana. Os vídeos da primeira semana têm cerca de 2,5 horas de duração no total.
+
+### B.4.2 Prática Básica
+
+Aqui fornecemos alguns fragmentos de código para familiarizá-lo com algumas práticas básicas em R. Recomendamos que você pratique digitando os fragmentos de código em seu Editor e, em seguida, avaliando-os.
+
+#### B.4.2.1 Criando uma Sessão no R
+
+Em geral, lemos outros arquivos, como dados ou funções, no R e produzimos resultados, como gráficos ou tabelas, em arquivos não contidos em uma sessão do R. Para fazer isso, devemos dar a R um "endereço" no qual ele possa localizar tais arquivos. Pode ser mais eficiente fazer isso definindo um diretório de trabalho, um caminho de arquivo no qual os arquivos relevantes são armazenados. Podemos identificar o diretório de trabalho atual usando `getwd()` e definir um novo usando `setwd()`. Observe que a sintaxe desses caminhos de arquivo varia de acordo com o sistema operacional.
+
+```{r 4, eval=F, echo=TRUE}
+getwd()
+```
+
+```{r 5, eval = F}
+setwd("~TaraLyn/EGAP Learning Days Admin/Workshop 2018_2 (Uruguay)/")   
+```
+
+Pode ser necessário instalar pacotes além dos listados acima para executar determinadas funções. Para instalar pacotes utilizamos `install.packages("")`, preenchendo o nome do pacote entre as marcas "", conforme segue. Você só precisa instalar os pacotes uma vez.
+
+```{r 6,eval=FALSE, echo=TRUE}
+install.packages("randomizr")  
+```
+
+Depois que um pacote é instalado, ele pode ser carregado e acessado usando library() onde o nome do pacote é inserido entre parênteses (sem marcas "").
+
+```{r 7, eval= F, echo=TRUE}
+library(randomizr)
+```
+
+Para limpar a memória de dados do R, funções ou valores armazenados que aparecem na guia de contabilidade, use `rm(list = ls())`. Pode ser útil definir uma semente de número aleatório para garantir que a replicação seja possível em uma sessão R diferente, principalmente quando trabalhamos com métodos baseados em simulação.
+
+```{r echo=TRUE}
+rm(list = ls())                                   
+set.seed(2018)  # Opcional: Definir uma semente para que o resultado seja replicável
+```
+
+#### Noções Básicas de R
+
+Agora vamos explorar alguns comandos básicos. Para atribuir um escalar (elemento único) a uma variável, usamos o comando `<-` conforme discutido anteriormente:
+
+```{r echo=TRUE}
+# "<-"  é o comando de atribuição; é usado para definir coisas. exemplo:
+(a <- 5)     
+```
+
+Também podemos querer atribuir um vetor de elementos a uma variável. Aqui usamos o mesmo comando `<-`, mas focado em como criar o vetor.
+
+```{r echo=TRUE}
+(b <- 1:10)              # ":"  é usado para definir uma série de números inteiros
+(v <- c(1, 3, 2, 4, pi))   # use c() para fazer um vetor com qualquer coisa dentro 
+```
+
+Podemos então nos referir aos elementos de um vetor denotando sua posição em um vetor entre colchetes `[]`.
+
+```{r echo=TRUE}
+# Extração de elementos de um vetor:
+b[1]                   # Retorna a posição 1
+b[5:4]                 # Retorna as posições 5 e 4, nesta ordem order
+b[-1]                  # Returns todos menos o primeiro número 
+
+# Retorna todos os números indicados como 'TRUE' (Verdadeiro)
+b[c(TRUE, FALSE, TRUE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE, FALSE)]  
+                                                                          
+# Atribuir novos valores para elementos particulares de um vetor
+b[5] <- 0
+```
+
+Há um conjunto de funções internas que podem ser aplicadas a vetores como `b`.
+
+```{r echo=TRUE}
+sum(b)      # Soma de todos os elementos
+mean(b)     # Média de todos os elementos
+max(b)      # Máximo valor de todos os elementos
+min(b)      # Minímo valor de todos os elementos
+sd(b)       # Desvio Padrão de todos os elementos
+var(b)      # Variância de todos os elementos
+```
+
+Também podemos aplicar transformações aritméticas a todos os elementos de um vetor:
+
+```{r echo=TRUE}
+b^2               # Quadrado da variável
+b^.5              # Raiz Quadrada da variável
+log(b)            # Log da variável
+exp(b)            # Exponencial de b
+```
+
+Finalmente, podemos avaliar declarações lógicas (ou seja, a condição X é verdadeira?'') em todos os elementos de um vetor:
+
+```{r echo=TRUE}
+b == 2                     # É igual a 
+b < 5                      # Menor que
+b >= 5                     # Maior ou igual a 
+b <= 5 | b / 4 == 2        # | significa 'OU'
+b>2 & b<9                  # & significa 'E'
+is.na(b)                   # Indica se há dados faltando
+which(b<5)       # Indica se os valores possuem os requerimentos lógicos
+```
+
+A lógica básica desses comandos se aplica a estruturas de dados muito mais complexas do que escalares e vetores. A compreensão desses recursos básicos ajudará a facilitar sua compreensão de tópicos mais avançados durante as Jornadas de Aprendizado.
