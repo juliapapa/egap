@@ -1,0 +1,1318 @@
+---
+title: "julia_cluster_random_pt"
+author: "Júlia Papa"
+date: "26/03/2023"
+bibliography: cluster_random.bib
+output:
+  html_document:
+    toc: true
+    theme: journal
+    includes:
+        after_body: ../linking_script.html
+---
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+# 10 Pontos para Entender Randomização de Agrupamentos (Clusters)
+
+[In English](https://egap.org/resource/10-things-to-know-about-cluster-randomization/)
+
+[En Español](https://egap.org/es/resource/10-cosas-sobre-la-aleatorizacion-por-aglomerados/)
+
+[En Français](https://egap.org/fr/resource/10-choses-a-savoir-sur-la-randomisation-par-grappe/)
+
+Autor: [Jake Bowers](https://egap.org/resource/10-things-to-know-about-cluster-randomization/)
+
+```{r,echo=FALSE, message=FALSE}
+rm(list = ls())
+library(knitr)
+library(lme4)
+```
+
+## 1 O que é agrupamento (clusterização)
+
+Experimentos com randomização de agrupamentos[^1] (clusters) atribuem tratamentos a grupos, mas medem resultados no nível dos indivíduos que compõem os grupos. É essa divergência entre o nível em que a intervenção é atribuída e o nível em que os resultados são definidos que classifica um experimento como sendo randomizado por clusters.
+
+[^1]: Este guia foi originalmente escrito por Jake Bowers e Ashlea Rundlett em 22 de novembro de 2014. Atualizações foram feitas por Jasper Cooper em 25 de agosto de 2015 e por Anna Wilke em março de 2022.
+
+Considere um estudo que atribui aleatoriamente vilarejos para receberem diferentes programas de desenvolvimento, onde o bem-estar das famílias no vilarejo é o resultado de interesse. Isso é um experimento de cluster, porque, enquanto o tratamento é atribuído ao agrupamento como um todo, estamos interessados nos resultados definidos no nível das famílias. Ou considere um estudo que atribui aleatoriamente determinadas famílias para receber diferentes mensagens de incentivo à votação, onde estamos interessados no comportamento de voto dos indivíduos. Porque a unidade de atribuição para a mensagem é a família, mas o resultado é definido como comportamento individual, este estudo é aleatorizado por agrupamentos (clusters).
+
+O agrupamento (clustering) é importante por duas razões principais. Por um lado, o agrupamento reduz a quantidade de informações em um experimento, pois restringe o número de maneiras pelas quais os grupos de tratamento e controle podem ser compostos, em comparação com a randomização no nível individual. Se esse fato não for levado em consideração, frequentemente subestimamos a variância em nosso estimador, levando a uma confiança excessiva nos resultados do estudo. Por outro lado, o agrupamento levanta a questão de como combinar informações de diferentes partes do mesmo experimento em uma única quantidade. Especialmente quando os agrupamentos não têm tamanhos iguais e os resultados potenciais das unidades dentro deles são muito diferentes, estimadores convencionais produzirão sistematicamente a resposta errada devido ao viés. No entanto, várias abordagens nas fases de projeto e análise podem superar os desafios apresentados pelos desenhos de experimentos aleatórios por agrupamentos (clusters).
+
+# 2 Por que a clusterização pode ser importante I: redução de informações
+
+Normalmente, consideramos as informações contidas em estudos em termos do tamanho da amostra e das características das unidades dentro da amostra. No entanto, dois estudos com exatamente o mesmo tamanho de amostra e os mesmos participantes poderiam, teoricamente, conter quantidades muito diferentes de informações, dependendo se as unidades estão agrupadas. Isso afetará significativamente a precisão das inferências que fazemos com base nos estudos.
+
+Imagine uma avaliação de impacto com 10 pessoas, onde 5 são atribuídas ao grupo de tratamento e 5 ao grupo de controle. Em uma versão do experimento, o tratamento é atribuído aos indivíduos - não é aleatório por agrupamentos (clusters). Em outra versão do experimento, os 5 indivíduos com cabelo preto e os 5 indivíduos com outra cor de cabelo são atribuídos ao tratamento como um grupo. Este desenho possui dois clusters: 'cabelo preto' e 'outra cor'.
+
+Uma simples aplicação da regra "*n choose k*" mostra porque isso é importante. Na primeira versão, o procedimento de randomização permite 252 combinações diferentes de pessoas como grupos de tratamento e controle. No entanto, na segunda versão, o procedimento de randomização atribui todos os indivíduos de cabelo preto ou ao tratamento ou ao controle, resultando apenas em duas maneiras de combinar as pessoas para estimar um efeito.
+
+Ao longo deste guia, ilustraremos alguns pontos usando exemplos escritos em código `R`. Você pode copiar e colar isso em seu próprio programa `R` para ver como funciona.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+set.seed(12345)
+# Defina o efeito médio do tratamento na amostra (SATE)
+treatment_effect     <- 1
+# Defina os IDs individuais (i)
+person               <- 1:10
+# Defina o indicador de agrupamento (cluster) (j)
+hair_color           <- c(rep("black",5),rep("brown",5))
+# Defina o resultado do grupo de controle (Y0)
+outcome_if_untreated <- rnorm(n = 10)
+# Define o resultado do grupo de tratamento (Y1)
+outcome_if_treated   <- outcome_if_untreated + treatment_effect
+
+# Versão 1 - Não aleatorizada por agrupamentos (clusters)
+# Gerar todas  as atribuições não agrupadas (clusteridas) de tratamento possíveis (Z)
+non_clustered_assignments <- combn(x = unique(person),m = 5)
+# Estimação do efeito de tratamento
+treatment_effects_V1 <-
+     apply(
+          X = non_clustered_assignments,
+          MARGIN = 2,
+          FUN = function(assignment) {
+               treated_outcomes   <- outcome_if_treated[person %in% assignment]
+               untreated_outcomes <- outcome_if_untreated[!person %in% assignment]
+               mean(treated_outcomes) - mean(untreated_outcomes)
+          }
+     )
+# Estimação do erro-padrão verdadeiro
+standard_error_V1 <- sd(treatment_effects_V1)
+# Plotar o histograma de todasd as possíveis estimativas de tratamento
+hist(treatment_effects_V1,xlim = c(-1,2.5),breaks = 20)
+```
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Versão 2 - randomizada em agrupamentos (clusters)
+# Gerar todas as possíveis atribuições de tratamento ao agrupar por cor de cabelo(Z)
+clustered_assignments     <- combn(x = unique(hair_color),m = 1)
+# Estimar o efeito de tratamento
+treatment_effects_V2 <-
+     sapply(
+          X = clustered_assignments,
+          FUN = function(assignment) {
+               treated_outcomes   <- outcome_if_treated[person %in% person[hair_color==assignment]]
+               untreated_outcomes <- outcome_if_untreated[person %in% person[!hair_color==assignment]]
+               mean(treated_outcomes) - mean(untreated_outcomes)
+          }
+     )
+# Estimar o erro padrão verdadeiro 
+standard_error_V2 <- sd(treatment_effects_V2)
+# Plotar o histograma de todas as possíveis estimativas do efeito do tratamento'
+hist(treatment_effects_V2,xlim = c(-1,2.5),breaks = 20)
+```
+
+Como os histogramas mostram, o agrupamento (cluster) fornece uma visão muito mais "grossa" do efeito do tratamento. Independentemente do número de vezes que se randomiza o tratamento e do número de sujeitos que se tem, em um procedimento de randomização por agrupamento, o número de possíveis estimativas do efeito do tratamento será estritamente determinado pelo número de agrupamentos atribuídos às diferentes condições de tratamento. Isso tem implicações importantes para o erro-padrão do estimador.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r}
+# Comparar os erros-padrão
+kable(round(data.frame(standard_error_V1,standard_error_V2),2))
+```
+
+\
+Enquanto a distribuição amostral para a estimativa não agrupada (clusterizada) do efeito do tratamento tem um erro-padrão de cerca de 0,52, a da estimativa agrupada é mais do que o dobro, com 1,13. Lembre-se de que os dados utilizados em ambos os estudos são idênticos, sendo a única diferença entre os estudos a forma como o mecanismo de atribuição do tratamento revela a informação.
+
+Relacionado a essa questão de informações, há a questão de quão variáveis são as unidades em nosso estudo dentro e entre os agrupamentos (clusters). Dois estudos randomizado em agrupamentos (clusters) com $J=10$ vilarejos e $n_j=100$ pessoas por vilarejo podem ter informações diferentes sobre o efeito do tratamento nos indivíduos se, em um estudo, as diferenças entre os vilarejos forem muito maiores do que as diferenças nos resultados dentro delas. Por exemplo, se todos os indivíduos de qualquer vilarejo agirem exatamente da mesma maneira, mas diferentes vilarejos mostrarem resultados diferentes, então teríamos cerca de 10 peças de informação: todas as informações sobre os efeitos causais nesse estudo estariam no nível do vilarejo. Por outro lado, se os indivíduos dentro de um vilarejo agirem mais ou menos independentemente uns dos outros, então teríamos cerca de 10 $\times$ 100=1000 peças de informação.
+
+Podemos formalizar a ideia de que os agrupamentos (clusters) altamente dependentes fornecem menos informações do que os agrupamentos (clusters) altamente independentes com o **coeficiente de correlação intraclasse (ICC)**. Para uma variável dada, $y$, unidades $i$ e clusters $j$, podemos escrever o coeficiente de correlação intraclasse da seguinte forma:
+
+$$ \text{ICC} \equiv \frac{\text{variância entre clusters em } y}{\text{variância total em } y} \equiv \frac{\sigma_j^2}{\sigma_j^2 + \sigma_i^2} $$
+
+onde $\sigma_i^2$ é a variância entre as unidades na população e $\sigma_j^2$ é a variância entre os resultados definidos no nível do agrupamento (cluster). @kish1965survey usa essa descrição de dependência para definir sua ideia de "N efetivo" de um estudo (no contexto de pesquisa amostral, onde as amostras podem ser agrupadas):
+
+$$\text{N efetivo}=\frac{N}{1+(n_j -1)\text{ICC}}=\frac{Jn}{1+(n-1)\text{ICC}},$$
+
+onde o segundo termo segue se todos os agrupamentos (clusters) tiverem o mesmo tamanho ($n_1 \ldots n_J \equiv n$).
+
+\
+Se 200 observações surgirem de 10 clusters, com 20 indivíduos em cada cluster, em que o ICC = 0,5, o que significa que 50% da variação pode ser atribuída a diferenças entre clusters (e não a diferenças dentro de um cluster), a fórmula de Kish sugeriria que temos um tamanho de amostra efetivo de cerca de 19 observações, em vez de 200.
+
+Como a discussão anterior sugere, o agrupamento reduz a informação principalmente quando a) restringe significativamente o número de formas nas quais os sujeitos podem ser atribuídos aos grupos de tratamento e controle, e b) produz unidades cujos resultados estão fortemente relacionados ao cluster do qual são membros (ou seja, quando aumenta o ICC).
+
+# 3 Como lidar com redução de informação
+
+Uma maneira de limitar a extensão pela qual o agrupamento (cluster) reduz a informação contida em nosso desenho seria formar agrupamentos (clusters) de tal maneira que a correlação intra clusters seja baixa. Por exemplo, se pudéssemos formar clusters de forma aleatória, não haveria relação sistemática entre as unidades dentro de um cluster. Portanto, usar a atribuição aleatória por cluster para atribuir esses clusters formados aleatoriamente às condições experimentais não resultaria em redução de informação. No entanto, oportunidades para criar clusters são geralmente raras. Na maioria dos casos, temos que contar com clusters naturalmente formados (por exemplo, vilarejos, salas de aula, cidades). Na maioria dos cenários que envolvem atribuição agrupada, portanto, devemos garantir que nossas estimativas de incerteza sobre os efeitos do tratamento reflitam corretamente a perda de informação resultante do agrupamento.
+
+Para caracterizar nossa incerteza sobre os efeitos do tratamento, geralmente queremos calcular um erro padrão: uma estimativa de quanto nossas estimativas dos efeitos do tratamento variariam se pudéssemos repetir o experimento um número muito grande de vezes e, para cada repetição, observar as unidades em seu estado tratado ou não tratado resultante.
+
+No entanto, nunca somos capazes de observar o verdadeiro erro padrão de um estimador e, portanto, devemos usar procedimentos estatísticos para inferir essa quantidade desconhecida. Métodos convencionais para calcular os erros-padrão não levam em consideração o agrupamento. Assim, para evitar excesso de confiança nos resultados experimentais, precisamos modificar a maneira como calculamos as estimativas de incerteza.
+
+Nesta seção, limitamos nossa atenção às abordagens denominadas 'baseadas em design' para calcular o erro padrão. Na abordagem baseada em design, simulamos repetições do experimento para derivar e verificar maneiras de caracterizar a variância da estimativa do efeito do tratamento, levando em consideração a randomização em clusters. Contrastamos essas abordagens com as abordagens 'baseadas em modelo' mais adiante no guia. Na abordagem baseada em modelo, afirmamos que os resultados foram gerados de acordo com um modelo probabilístico e que as relações entre clusters também seguem um modelo probabilístico.
+
+Para começar, vamos criar uma função que simula um experimento com randomização em clusters com uma correlação intra clusters fixa e usá-la para simular alguns dados de um desenho simples com randomização em clusters.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+make_clustered_data <- function(J = 10, n = 100, treatment_effect = .25, ICC = .1){
+     ## Inspirado em Mathieu et al, 2012, Journal of Applied Psychology
+     if (J %% 2 != 0 | n %% 2 !=0) {
+          stop(paste("Número de clusters (J) e tamanho de clusters (n) deve ser igual."))
+     }
+     Y0_j         <- rnorm(J,0,sd = (1 + treatment_effect) ^ 2 * sqrt(ICC))
+     fake_data    <- expand.grid(i = 1:n,j = 1:J)
+     fake_data$Y0 <- rnorm(n * J,0,sd = (1 + treatment_effect) ^ 2 * sqrt(1 - ICC)) + Y0_j[fake_data$j]
+     fake_data$Y1 <- with(fake_data,mean(Y0) + treatment_effect + (Y0 - mean(Y0)) * (2 / 3))
+     fake_data$Z  <- ifelse(fake_data$j %in% sample(1:J,J / 2) == TRUE, 1, 0)
+     fake_data$Y  <- with(fake_data, Z * Y1 + (1 - Z) * Y0)
+     return(fake_data)
+}
+
+set.seed(12345)
+pretend_data <- make_clustered_data(J = 10,n = 100,treatment_effect = .25,ICC = .1)
+```
+
+Como criamos os dados nós mesmos, podemos calcular o erro padrão verdadeiro do nosso estimador. Primeiramente, geramos a verdadeira distribuição amostral simulando todas as possíveis permutações do tratamento e calculando a estimativa em cada uma delas. O desvio padrão dessa distribuição é o erro padrão do estimador.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+#  Definir o número de clusters
+J <- length(unique(pretend_data$j))
+# Gerar todas as possíveis combinações de clusters em um grupo de tratamento
+all_treatment_groups <- with(pretend_data,combn(x = 1:J,m = J/2))
+# Criar uma função para estimar o efeito
+clustered_ATE <- function(j,Y1,Y0,treated_clusters) {
+     Z_sim    <- (j %in% treated_clusters)*1
+     Y        <- Z_sim * Y1 + (1 - Z_sim) * Y0
+     estimate <- mean(Y[Z_sim == 1]) - mean(Y[Z_sim == 0])
+     return(estimate)
+}
+
+set.seed(12345)
+# Aplicar a função para todas as possíveis atribuições de tratamento
+cluster_results <- apply(
+  X = all_treatment_groups, MARGIN = 2,
+                         FUN = clustered_ATE,
+                         j  = pretend_data$j,Y1 = pretend_data$Y1,
+  Y0 = pretend_data$Y0
+)
+
+true_SE <- sd(cluster_results)
+
+true_SE
+```
+
+Isso resulta em um erro padrão de `r round(true_SE, 2)`. Podemos comparar o erro padrão verdadeiro com outros dois tipos de erros padrão comumente utilizados. O primeiro ignora o agrupamento (cluster) e assume que as estimativas do efeito do tratamento são distribuídas de forma idêntica e independente de acordo com uma distribuição normal. Vamos nos referir a isso como erro padrão I.I.D. Para levar em conta o agrupamento, podemos usar a seguinte fórmula para o erro padrão:
+
+$$\text{Var}_\text{clustered}(\hat{\tau})=\frac{\sigma^2}{\sum_{j=1}^J \sum_{i=1}^{n_j} (Z_{ij}-\bar{Z})^2} (1-(n-1)\rho)$$
+
+onde $\sigma^2=\sum_{j=1}^J \sum_{i=1}^{n_j} (Y_{ij} - \bar{Y}_{ij})^2$ (seguindo @arceneaux2009modeling ). Esse ajuste para o erro padrão I.I.D. é comumente conhecido como "Erro Padrão Robusto com Clustering" ou RCSE (Robust Clustered Standard Error, em inglês).
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T, error=FALSE, message=FALSE, warning=FALSE}
+
+ATE_estimate <- lm(Y ~ Z,data = pretend_data)
+
+IID_SE <- function(model) {
+     return(sqrt(diag(vcov(model)))[["Z"]])
+}
+
+RCSE <- function(model, cluster,return_cov = FALSE){
+  require(sandwich)
+  require(lmtest)
+  M <- length(unique(cluster))
+  N <- length(cluster)
+  K <- model$rank
+  dfc <- (M/(M - 1)) * ((N - 1)/(N - K))
+  uj <- apply(estfun(model), 2, function(x) tapply(x, cluster, sum))
+  rcse.cov <- dfc * sandwich(model, meat = crossprod(uj)/N)
+  rcse.se <- as.matrix(coeftest(model, rcse.cov))
+  if(return_cov){
+    return(rcse.cov)
+  }else{
+    return(rcse.se)
+  }
+}
+
+IID_SE_estimate <- IID_SE(model = ATE_estimate)
+
+RCSE_estimate   <- RCSE(model = ATE_estimate,cluster = pretend_data$j)
+
+knitr::kable(round(
+  data.frame(
+     true_SE         = true_SE,
+     IID_SE_estimate = IID_SE_estimate,
+    RCSE_estimate   = RCSE_estimate["Z", "Std. Error"]
+  ),
+  2
+))
+```
+
+Quando ignoramos o agrupamento (cluster), o erro padrão fica muito pequeno: estamos muito confiantes sobre a quantidade de informação fornecida pelo experimento. O RCSE é ligeiramente mais conservador do que o erro padrão verdadeiro nesse caso, mas é muito próximo. A discrepância provavelmente ocorre porque o RCSE não é uma boa aproximação do erro padrão verdadeiro quando o número de clusters é tão pequeno quanto neste caso. Para ilustrar ainda mais o ponto, podemos comparar uma simulação do erro padrão verdadeiro gerada através de permutações aleatórias do tratamento com os erros padrão IID e RCSE.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+
+compare_SEs <- function(data) {
+     simulated_SE <- sd(replicate(
+          5000,
+          clustered_ATE(
+               j = data$j,
+               Y1 = data$Y1,
+               Y0 = data$Y0,
+               treated_clusters = sample(unique(data$j),length(unique(data$j))/2)
+    )
+  ))
+     ATE_estimate <- lm(Y ~ Z,data)
+     IID_SE_estimate <- IID_SE(model = ATE_estimate)
+     RCSE_estimate <- RCSE(model = ATE_estimate,cluster = data$j)["Z", "Std. Error"]
+     return(round(c(
+          simulated_SE = simulated_SE,
+          IID_SE = IID_SE_estimate,
+          RCSE = RCSE_estimate
+     ),3))
+}
+
+J_4_clusters    <- make_clustered_data(J = 4)
+J_10_clusters   <- make_clustered_data(J = 10)
+J_30_clusters   <- make_clustered_data(J = 30)
+J_100_clusters  <- make_clustered_data(J = 100)
+J_1000_clusters <- make_clustered_data(J = 1000)
+
+set.seed(12345)
+
+knitr::kable(rbind(
+  c(J = 4,compare_SEs(J_4_clusters)),
+  c(J = 30,compare_SEs(J_30_clusters)),
+  c(J = 100,compare_SEs(J_100_clusters)),
+  c(J = 1000,compare_SEs(J_1000_clusters))
+  ))
+```
+
+Conforme esses exemplos simples ilustram, a estimativa do erro padrão agrupado (RCSE) se aproxima da verdade (o erro padrão simulado) à medida que o número de agrupamentos (clusters) aumenta. Enquanto isso, o erro padrão ignorando o agrupamento (assumindo IID) tende a ser menor do que qualquer um dos outros erros padrão. Quanto menor for a estimativa do erro padrão, mais precisas as estimativas parecem para nós e maior a probabilidade de encontrarmos resultados que parecem "estatisticamente significativos". Isso é problemático: neste caso, o erro padrão IID nos leva a ter muita confiança em nossos resultados porque ele ignora a correlação intracluster, ou seja, a extensão em que as diferenças entre as unidades podem ser atribuídas ao cluster ao qual pertencem. Se estimarmos os erros padrão usando técnicas que subestimam nossa incerteza, temos mais chances de rejeitar falsamente hipóteses nulas quando não deveríamos.
+
+Uma outra forma de lidar com os problemas que o agrupamento introduz no cálculo dos erros padrão é analisar os dados no nível do cluster. Nessa abordagem, calculamos médias ou somas dos resultados dentro dos clusters e tratamos o estudo como se tivesse ocorrido apenas no nível do cluster.
+
+@hansen2008covariate mostra que podemos caracterizar a distribuição da diferença das médias usando o que sabemos sobre a distribuição da *soma* dos resultados no grupo de tratamento, que varia de uma atribuição de tratamento para outra.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Agregue os dados do nível de unidade para o nível do cluster
+# Some os resultados no nível do cluster
+Yj <- tapply(pretend_data$Y,pretend_data$j,sum)
+# Agregue o indicador de atribuição ao tratamento no nível do cluster
+Zj <- tapply(pretend_data$Z,pretend_data$j,unique)
+# Calcule o tamanho único do cluster
+n_j <- unique(as.vector(table(pretend_data$j)))
+# Calcule o tamanho da amostra total (agora os clusters são as unidades)
+N <- length(Zj)
+# Gere o identificador do cluster
+j <- 1:N
+# Calcule o número de clusters tratados
+J_treated <- sum(Zj)
+
+# Crie uma função para o estimador de diferença nas médias no nível do cluster (Veja Hansen & Bowers 2008)
+cluster_difference <- function(Yj,Zj,n_j,J_treated,N){
+     ones <- rep(1, length(Zj))
+     ATE_estimate <- crossprod(Zj,Yj)*(N/(n_j*J_treated*(N-J_treated))) -
+          crossprod(ones,Yj)/(n_j*(N-J_treated))
+     return(ATE_estimate)
+}
+
+# Dado clusters de tamanho igual e ausência de blocagem, isso é idêntico à diferença de médias no nível de unidade
+
+ATEs <- colMeans(data.frame(
+  cluster_level_ATE =
+               cluster_difference(Yj,Zj,n_j,J_treated,N),
+          unit_level_ATE =
+    with(pretend_data, mean(Y[Z == 1]) - mean(Y[Z == 0]))
+))
+
+knitr::kable(data.frame(ATEs),align = "c")
+```
+
+Para caracterizar a incerteza em relação ao ATE no nível do cluster, podemos aproveitar o fato de que o único elemento aleatório do estimador é agora o produto cruzado entre o vetor de atribuição no nível do cluster e o resultado no nível do cluster, $\mathbf{Z}^\top\mathbf{Y}$, escalado por uma constante. Podemos estimar a variância desse componente aleatório por meio da permutação do vetor de atribuição ou por meio de uma aproximação da variância, assumindo que a distribuição amostral segue uma distribuição normal.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Aproximando a variância usando suposições de normalidade
+normal_sampling_variance <-
+     (N/(n_j*J_treated*(N-J_treated)))*(var(Yj)/n_j)
+# Aproximando a variância usando permutações
+set.seed(12345)
+sampling_distribution <- replicate(10000,cluster_difference(Yj,sample(Zj),n_j,J_treated,N))
+
+ses <- data.frame(
+  sampling_variance = c(sqrt(normal_sampling_variance), sd(sampling_distribution)),
+  p_values = c(
+    2 * (1 - pnorm(abs(ATEs[1]) / sqrt(normal_sampling_variance), mean = 0)),
+                               2*min(mean(sampling_distribution>=ATEs[1]),mean(sampling_distribution<=ATEs[1]))
+  )
+)
+
+rownames(ses) <- c("Assumindo Normalidade","Permutações")
+
+knitr::kable(ses)
+```
+
+Essa abordagem em nível de cluster tem a vantagem de caracterizar corretamente a incerteza sobre os efeitos quando a randomização é agrupada, sem a necessidade de usar os erros padrão RCSE para as estimativas em nível de unidade, que são excessivamente permissivos para N pequenos. De fato, a taxa de falsos positivos de testes baseados em erros padrão RCSE tende a ser incorreta quando o número de clusters é pequeno, levando a uma superconfiança. No entanto, como veremos abaixo, quando o número de clusters é muito pequeno ($J=4$), a abordagem em nível de cluster é excessivamente conservadora, rejeitando a hipótese nula com uma probabilidade de 1. Uma desvantagem da abordagem em nível de cluster é que ela não permite a estimativa de quantidades de interesse em nível de unidade, como efeitos de tratamento heterogêneos.
+
+# 4 Por que a clusterização pode importar II: tamanhos diferentes de clusters e viés
+
+Quando os agrupamentos (clusters) têm tamanhos diferentes, isso pode apresentar uma classe única de problemas relacionados à estimativa do efeito do tratamento. Especialmente quando o tamanho do cluster está de alguma forma relacionado aos resultados potenciais das unidades dentro dele, muitos estimadores convencionais do efeito médio do tratamento na amostra (SATE) podem ser tendenciosos.
+
+Para ilustrar, imagine uma intervenção direcionada a empresas de diferentes tamanhos, com o objetivo de aumentar a produtividade dos trabalhadores. Devido às economias de escala, espera-se que o aumento de produtividade seja muito mais presente nos funcionários de empresas grandes em comparação aos funcionários de empresas menores. Suponha que o experimento inclua 20 empresas, variando em tamanho desde empreendimentos de uma pessoa até grandes organizações com mais de 500 funcionários. Metade das empresas é designada para o grupo de tratamento e a outra metade para o grupo de controle. As medidas de resultado são definidas no nível dos funcionários.
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+set.seed(1000)
+# Número de empresas
+J <- 20
+
+# empregados por empresas
+n_j <- rep(2^(0:(J/2-1)),rep(2,J/2))
+
+# Número total de empregados 
+N <- sum(n_j)
+# 2046
+
+# ID de Empregado único (unidade)
+i <- 1:N
+
+# ID de Empresa única (cluster) 
+j <- rep(1:length(n_j),n_j)
+
+# Efeitos de tratamento específicos da firma
+cluster_ATE <- n_j^2/10000
+
+# Produtividade não tratada
+Y0 <- rnorm(N)
+
+# Produtividade tratada
+Y1 <- Y0 + cluster_ATE[j]
+
+# Efeito de tratamento médio verdadeiro da amostra
+(true_SATE <- mean(Y1-Y0))
+```
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Correlação entre tamanho da empresa e efeito 
+cor(n_j,cluster_ATE)
+```
+
+Como podemos ver, há uma alta correlação entre o efeito do tratamento e o tamanho do cluster. Agora vamos simular 1000 análises desse experimento, permutando o vetor de atribuição do tratamento a cada vez, e considerando a diferença não ponderada de médias como uma estimativa do efeito médio do tratamento na amostra.
+
+::: {.hidecode onclick="doclick(this);"}
+[Click to show code]
+:::
+
+```{r,cache=T}
+set.seed(1234)
+# Estimativa do SATE não ponderada
+SATE_estimate_no_weights <- NA
+for(i in 1:1000){
+     # Atribuição aleatória de tratamento em cluster para metade das empresas
+     Z <- (j %in% sample(1:J,J/2))*1
+     # Revelar os resultados
+     Y <- Z*Y1 + (1-Z)*Y0
+     # Estimar o SATE
+     SATE_estimate_no_weights[i] <- mean(Y[Z==1])-mean(Y[Z==0])
+     }
+
+# Gerar histograma dos efeitos estimados
+hist(SATE_estimate_no_weights,xlim = c(true_SATE-2,true_SATE+2),breaks = 100)
+# Adicionar a estimativa esperada do SATE usando esse estimador
+abline(v=mean(SATE_estimate_no_weights),col="blue")
+# E adicionar o SATE verdadeiro
+abline(v=true_SATE,col="red")
+```
+
+O histograma mostra a distribuição amostral do estimador, com o SATE verdadeiro em vermelho e a estimativa não ponderada em azul. O estimador é enviesado: em média, não recuperamos o SATE verdadeiro, mas o subestimamos. Intuitivamente, podemos esperar corretamente que o problema esteja relacionado ao peso relativo dos clusters no cálculo do efeito do tratamento. No entanto, nesta situação, calcular a diferença na média ponderada do resultado entre clusters tratados e de controle não é suficiente para fornecer um estimador não enviesado (veja o código abaixo).
+
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+set.seed(1234)
+# Médias ponderadas por agrupamento (cluster)
+SATE_estimate_weighted <- NA
+for(i in 1:1000){
+     # Define os clusters alocados para tratamento
+     treated_clusters <- sample(1:J,J/2,replace = F)
+     # Gra o vetor de atribuição por unidade
+     Z <- (j %in% treated_clusters)*1
+     # Revelar os resultados
+     Y <- Z*Y1 + (1-Z)*Y0
+     # Calcular os pesos do cluster 
+     treated_weights <- n_j[1:J%in%treated_clusters]/sum(n_j[1:J%in%treated_clusters])
+     control_weights <- n_j[!1:J%in%treated_clusters]/sum(n_j[!1:J%in%treated_clusters])
+     # Calcular as médias de cada cluster
+     treated_means <- tapply(Y,j,mean)[1:J%in%treated_clusters]
+     control_means <- tapply(Y,j,mean)[!1:J%in%treated_clusters]
+     # Calcular a estimativa ponderada do SATE por cluster
+     SATE_estimate_weighted[i] <-
+          weighted.mean(treated_means,treated_weights) -
+          weighted.mean(control_means,control_weights)
+}
+
+# Gerar o histograma dos efeitos estimados
+hist(SATE_estimate_weighted,xlim = c(true_SATE-2,true_SATE+2),breaks = 100)
+# Adicionar a estimativa esperada do SATE não ponderado
+abline(v=mean(SATE_estimate_no_weights),col="blue")
+# Adiciona a estimativa esperada do SATE ponderado
+abline(v=mean(SATE_estimate_weighted),col="green")
+# E adicionar o SATE verdadeiro
+abline(v=true_SATE,col="red")
+```
+
+O histograma mostra a distribuição amostral do estimador ponderado, com o verdadeiro SATE em vermelho, a estimativa não ponderada em azul e a estimativa ponderada em verde. Em média, a versão ponderada do estimador de fato fornece a mesma estimativa do SATE que a versão não ponderada. Qual é a natureza do viés?
+
+Em vez de atribuir o tratamento para metade dos clusters e comparar os resultados no nível dos grupos de "tratamento" e "controle", vamos imaginar que emparelhamos cada cluster com outro cluster e atribuímos o tratamento a um cluster de cada par. Nossa estimativa do efeito de tratamento será então a agregação das estimativas no nível dos pares. Isso é análogo ao procedimento de atribuição aleatória completa empregado anteriormente, no qual $J/2$ empresas foram atribuídas ao tratamento. Agora, vamos nos referir ao $k$-ésimo par dos $m$ pares, onde $2m = J$.
+
+Dado esse cenário, @imai2009essential fornecem a seguinte definição formal do viés no estimador de diferença nas médias ponderadas por cluster:
+
+$$\frac{1}{n}
+\sum^m_{k = 1}
+\sum^2_{l = 1}
+\left[
+\left(
+\frac{n_{1k} + n_{2k}}{{2} - n_{lk}}
+\right)
+\times
+\sum^{n_{lk}}_{i = 1}
+\frac{Y_{ilk}(1) - Y_{ilk}(0)}{n_{lk}}
+\right],$$
+
+onde $l = 1,2$ indexa os clusters dentro de cada par. Assim, $n_{1k}$ refere-se ao número de unidades no primeiro cluster do $k$-ésimo par de clusters.
+
+Essa expressão indica que o viés decorrente de tamanhos desiguais de clusters surge se e somente se duas condições forem atendidas. Em primeiro lugar, os tamanhos de pelo menos um par de clusters devem ser desiguais: quando $n_{1k}=n_{2k}$ para todos os $k$, o termo de viés é reduzido a 0. Em segundo lugar, os tamanhos de efeito ponderados de pelo menos um par de clusters devem ser desiguais: quando $\sum_{i = 1}^{n_{1k}}(Y_{i1k}(1)-Y_{i1k}(0))/n_{1k} = \sum_{i = 1}^{n_{2k}}(Y_{i2k}(1)-Y_{i2k}(0))/n_{2k}$ para todos os $k$, o viés também é reduzido a 0.
+
+# 5 O que fazer com agrupamentos (clusters) de diferentes tamanhos
+
+Dois outros métodos funcionam para amenizar esse problema de viés decorrente da correlação entre o tamanho do cluster e o efeito do tratamento: (1) condicionar diretamente ao tamanho do cluster e (2) usar o estimador de Horvitz-Thompson. Neste post do [DeclareDesign Blog](https://declaredesign.org/blog/bias-cluster-randomized-trials.html), são discutidas ambas as opções. Aqui, demonstraremos uma abordagem de emparelhamento para condicionar ao tamanho do cluster, utilizando os dados de exemplo que geramos anteriormente.
+
+Como a expressão acima sugere, para reduzir o viés decorrente do tamanho desigual do cluster para quase zero, é suficiente agrupar os clusters em pares que sejam de tamanho igual ou tenham resultados potenciais quase idênticos.
+
+Demonstramos essa abordagem abaixo utilizando os mesmos dados que examinamos no exemplo de um experimento hipotético de produtividade de funcionários randomizado por empresas.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+set.seed(1234)
+# Criar uma função que combina pares com base no tamanho
+pair_sizes <- function(j,n_j){
+     # Encontrar todos os tamanhos únicos
+     unique_sizes <- unique(n_j)
+     #  Encontrar o número de tamanhos únicos
+     N_unique_sizes <- length(unique_sizes)
+     # Gerar uma lista de candidatos para formar pares em cada tamanho de cluster
+  possible_pairs <- lapply(unique_sizes, function(size) {
+    which(n_j == size)
+  })
+     # Encontrar o número total de pares possíveis (m)
+     m_pairs <- length(unlist(possible_pairs))/2
+     #  Gerar um vetor com identificadores únicos de pares
+     pair_indicator <- rep(1:m_pairs,rep(2,m_pairs))
+     # Atribuir aleatoriamente unidades do mesmo tamanho de cluster a pares
+     pair_assignment <-
+          unlist(lapply(
+               possible_pairs,
+               function(pair_list){
+        sample(pair_indicator[unlist(possible_pairs) %in% pair_list])
+      }
+    ))
+     #  Gerar um vetor indicando o k-ésimo par para cada unidade i
+     pair_assignment <- pair_assignment[match(x = j,table = unlist(possible_pairs))]
+     return(pair_assignment)
+}
+
+pair_indicator <- pair_sizes(j = j , n_j = n_j)
+
+SATE_estimate_paired <- NA
+for(i in 1:1000){
+     # Agora percorrer o vetor de atribuições em pares
+     pair_ATEs <- sapply(unique(pair_indicator),function(pair){
+          #  Para cada par, atribuir aleatoriamente um à tratamento
+          Z <- j[pair_indicator==pair] %in% sample(j[pair_indicator==pair],1)*1
+          # Revelar os resultados potenciais do par
+          Y <- Z*Y1[pair_indicator==pair] + (1-Z)*Y0[pair_indicator==pair]
+          clust_weight <- length(j[pair_indicator==pair])/N
+          clust_ATE <- mean(Y[Z==1])-mean(Y[Z==0])
+          return(c(weight = clust_weight, ATE = clust_ATE))
+     })
+
+     SATE_estimate_paired[i] <- weighted.mean(x = pair_ATEs["ATE",],w = pair_ATEs["weight",])
+}
+
+# Gerar histograma dos efeitos estimados
+hist(SATE_estimate_paired,xlim = c(true_SATE-2,true_SATE+2),breaks = 100)
+# Adicionar a estimativa esperada do SATE emparelhado
+abline(v=mean(SATE_estimate_paired),col="purple")
+# E adicionar o verdadeiro SATE
+abline(v=true_SATE,col="red")
+```
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# O estimador emparelhado está muito mais próximo do verdadeiro SATE.
+kable(round(data.frame(
+  true_SATE = true_SATE,
+  paired_SATE = mean(SATE_estimate_paired),
+  weighted_SATE = mean(SATE_estimate_weighted),
+  unweighted_SATE = mean(SATE_estimate_no_weights)
+),2))
+```
+
+Apesar dos diferentes tamanhos de cluster (agrupamento), o viés é completamente eliminado por essa técnica: em média, o estimador emparelhado recupera o verdadeiro Efeito Médio de Tratamento na Amostra, enquanto os estimadores de diferença de médias ponderadas e não ponderadas por cluster são enviesados.
+
+Também observe que a variância na distribuição amostral é muito menor para o estimador emparelhado, resultando em estimativas muito mais precisas. Portanto, o emparelhamento de pares não apenas promete reduzir o viés, mas também pode mitigar significativamente o problema de redução de informação induzido pelo agrupamento.
+
+\
+No entanto, esse emparelhamento pré-randomização impõe algumas restrições ao estudo, algumas das quais podem ser difíceis de atender na prática. Por exemplo, pode ser difícil ou até impossível encontrar pares perfeitamente emparelhados para cada tamanho de agrupamento (cluster), especialmente quando existem múltiplos tratamentos (de modo que, em vez de pares, o tratamento é randomizado em trios ou quartetos). Nesses casos, os pesquisadores podem adotar várias outras soluções, como criar pares por meio do pareamento de covariáveis observadas antes da randomização, em que, por exemplo, a similaridade das covariáveis observadas dentro dos pares é maximizada. @imai2009essential recomendam um modelo de mistura para a estimativa pareada pós-randomização e detalham algumas das suposições que devem ser feitas para que essas estimativas sejam válidas. E este post do [DeclareDesign Blog](https://declaredesign.org/blog/bias-cluster-randomized-trials.html) demonstra a condicionamento no tamanho do cluster sem um emparelhamento estrito.
+
+# 6 Por que o clustering pode ser importante III: transbordamentos (spillovers) intra-clusters
+
+Na maioria dos experimentos, ou pelo menos em muitos deles, gostaríamos de estimar o efeito causal médio do tratamento dentro de uma população ou amostra. Denotando por $Y_{z_i}$ o resultado $Y$ da unidade $i$ quando atribuída ao status de tratamento $z_i \in \{1,0\}$, podemos definir essa quantidade - o ATE (Efeito Médio de Tratamento) - como o valor esperado da diferença entre a amostra quando atribuída ao tratamento, $Y_1$, e a amostra quando atribuída ao controle, $Y_0$: $E[Y_1 - Y_0]$.
+
+No entanto, pode ser o caso de que o resultado de uma unidade dependa do status de tratamento $z_j$ de outra unidade, $j$, dentro do mesmo agrupamento (cluster). Nesse caso, denotamos os resultados potenciais como $Y_{z_j, z_i} \in \{Y_{00}, Y_{10}, Y_{01}, Y_{11}\}$, onde uma unidade não tratada com um vizinho não tratado no cluster é definida como $Y_{00}$, uma unidade não tratada com um vizinho tratado no cluster como $Y_{10}$, uma unidade tratada com um vizinho não tratado no cluster como $Y_{01}$ e uma unidade tratada com um vizinho tratado no cluster como $Y_{11}$. Quando realizamos um experimento com randomização por cluster, normalmente assumimos que o resultado de uma unidade não é uma função do status de tratamento das unidades com as quais ela compartilha um cluster, ou formalmente $Y_{01}=Y_{11}=Y_1$ e $Y_{10}=Y_{00}=Y_0$. No entanto, por diversas razões, isso pode não ser o caso: dependendo de com quem alguém se encontra no mesmo cluster e se esse cluster é atribuído ao tratamento, seus resultados podem ser muito diferentes.
+
+Considere um experimento no qual cinco pares de estudantes que vivem em dormitórios são randomicamente designados para receber ou não receber um subsídio alimentar, e o bem-estar declarado é o resultado de interesse. Vamos assumir que quatro estudantes são vegetarianos (V) e seis são consumidores de carne (M). Quando um par VV, MM ou VM é designado para o grupo de controle, eles não recebem o subsídio e seu bem-estar não é afetado. No entanto, quando designados para o tratamento, os pares VM brigam, o que reduz seu bem-estar, enquanto os pares VV e MM não brigam e são afetados apenas pelo tratamento. Vamos denotar $x_k \in \{0,1\}$ como um indicador de se o par é desigual, onde o resultado da unidade é denotado por $Y_{z_j,z_j,x_k}$. Isso implica que $Y_{110} = Y_1$ e $Y_{000} = Y_{001} = Y_0$, enquanto $Y_{111} \neq Y_1$. Para entender como isso importa, vamos simular tal experimento.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T}
+# Criar dados experimentais
+N <- 10
+tipos <- c(rep("V", .4 * N), rep("M", .6 * N))
+ID <- 1:length(tipos)
+linha_de_base <- rnorm(length(ID))
+
+# O verdadeiro efeito do tratamento é 5
+verdadeiro_ATE <- 5
+# Se um par é não correspondido (VM, MV), eles recebem um efeito indireto de -10
+efeito_indireto_ou_nao <- function(tipo_i, tipo_j) {
+  ifelse(tipo_i == tipo_j, yes = 0, no = -10)
+}
+
+# Função para formar pares
+formar_pares <- function(ID, tipos) {
+  N <- length(ID)
+  k <- rep(1:(N/2), 2)
+  lugar_do_par <- rep(c(1, 2), c(N/2, N/2))
+  ID_selecionado <- sample(ID)
+  tipo_i <- tipos[ID_selecionado]
+  par_1 <- tipo_i[lugar_do_par == 1]
+  par_2 <- tipo_i[lugar_do_par == 2]
+  ID_j_1 <- ID_selecionado[lugar_do_par == 1]
+  ID_j_2 <- ID_selecionado[lugar_do_par == 2]
+  tipo_j <- c(par_2, par_1)
+  j <- c(ID_j_2, ID_j_1)
+  return(data.frame(i = ID_selecionado, j = j, k = k, tipo_i = tipo_i, tipo_j = tipo_j))
+}
+
+# Função para atribuir tratamento e revelar o resultado
+atribuir_revelar_est <- function(k, i, efeito, efeito_indireto) {
+  Z <- (k %in% sample(k, N/2)) * 1
+  Y <- linha_de_base[i] + Z * efeito + Z * efeito_indireto
+  mean(Y[Z == 1]) - mean(Y[Z == 0])
+}
+
+# Função para simular o experimento
+simular_exp <- function() {
+  dados <- formar_pares(ID, tipos)
+  efeito_indireto <- efeito_indireto_ou_nao(dados$tipo_i, dados$tipo_j)
+  estimativa <- atribuir_revelar_est(k = dados$k, efeito = verdadeiro_ATE, efeito_indireto = efeito_indireto, i = dados$i)
+  return(estimativa)
+}
+
+# Estimar os efeitos mil vezes
+estimativa_efeitos <- replicate(n = 1000, expr = simular_exp())
+
+# Plotar as estimativas como barras, o ATE esperado em azul e o ATE verdadeiro em vermelho
+hist(estimativa_efeitos, breaks = 30, col = "lightblue", main = "Efeitos do Tratamento Estimados",
+     xlab = "Efeito do Tratamento", ylab = "Frequência")
+abline(v = mean(estimativa_efeitos), col = "blue", lwd = 2)
+abline(v = verdadeiro_ATE, col = "red", lwd = 2)
+```
+
+Como mostra o gráfico acima, este é um estimador enviesado do verdadeiro efeito de tratamento ao nível individual, $Y_{01} - Y_{00}$. Em média, estimamos um efeito próximo de 0, obtendo efeitos muito negativos em quase metade das simulações deste experimento. O ponto-chave aqui é que o estimador muda: em vez do ATE, obtemos uma combinação do verdadeiro efeito de tratamento entre aqueles que são correspondidos (não sofrem efeitos indiretos) $E[Y_{110}-Y_{00x_k}]$, e o efeito combinado do tratamento e efeito indireto para aqueles que não são correspondidos $E[Y_{111}-Y_{00x_k}]$. No entanto, é crucial ressaltar que não podemos identificar o impacto do efeito indireto, $E[Y_{101}-Y_{00x_k}]$, independentemente do efeito direto. Isso ocorre porque a randomização é em nível de cluster: não é possível observar $Y_{101}$ em um esquema randomizado por cluster, pois todas as unidades dentro de um cluster são sempre tratadas. Em geral, essa questão é verdadeira para qualquer estudo randomizado por cluster: para afirmar que identificamos o efeito ao nível individual do tratamento, devemos assumir que $Y_{11}=Y_{1}$ e $Y_{00}=Y_{0}$.
+
+# 7 O que fazer com transbordamentos (spillovers) intra-clusters
+
+Se houver fortes razões para acreditar que ocorrem efeitos indiretos dentro dos clusters, os pesquisadores podem adotar abordagens diferentes, dependendo da forma como os clusters são formados. Em alguns estudos, os pesquisadores devem agrupar as unidades por conta própria para fins de experimentação: por exemplo, em um estudo envolvendo um programa vocacional, o pesquisador pode decidir quem é recrutado para qual turma. Nesses casos, se o pesquisador puder fazer suposições plausíveis sobre os efeitos indiretos, então o efeito de tratamento ao nível individual pode ser recuperável.
+
+Se um pesquisador conduzindo o estudo anterior corretamente assumiu que ocorreriam efeitos indiretos entre pares não correspondidos, nesse caso, o pesquisador pode recuperar o verdadeiro efeito de tratamento ao nível individual formando clusters que não sejam suscetíveis a esses efeitos indiretos.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T}
+form_matched_pairs <- function(ID,types){
+  pair_list <- lapply(unique(types),function(type){
+    ID <- ID[types == type]
+    types <- types[types == type]
+    draw_ID <- 1:length(types)
+    matched_pairs <- form_pairs(ID = draw_ID,types = types)
+    matched_pairs$i <- ID[matched_pairs$i]
+    matched_pairs$j <- ID[matched_pairs$j]
+    matched_pairs$k <- paste0(type,"_",matched_pairs$k)
+    return(matched_pairs)
+  })
+  data <- rbind(pair_list[[1]],pair_list[[2]])
+  return(data)
+}
+
+simulate_matched_exp <- function(){
+  data <- form_matched_pairs(ID,types)
+  spillover <- spillover_or_not(data$type_i,data$type_j)
+  estimate <- assign_reveal_est(k = data$k,effect = true_ATE,spillover = spillover,i = data$i)
+  return(estimate)
+}
+
+# Estimar os efeitos mil vezes
+est_matched_effects <- replicate(n = 1000,expr = simulate_matched_exp())
+
+hist(est_matched_effects,breaks = 100,xlim = c(-7,7))
+abline(v = true_ATE,col = "red")
+abline(v = mean(est_matched_effects,na.rm = T),col = "blue")
+```
+
+No caso em que os pesquisadores não conseguem controlar como os clusters são formados, eles ainda podem investigar a heterogeneidade dos efeitos do tratamento ao nível do cluster como forma de compreender os possíveis efeitos indiretos. No entanto, em ambos os casos, suposições devem ser feitas sobre a natureza dos efeitos indiretos. Estritamente falando, esses efeitos não podem ser identificados causalmente devido à não observabilidade dos resultados $Y_{01}$ e $Y_{10}$. Em última análise, seria necessário combinar esquemas de randomização com e sem clusters para estimar os efeitos dos efeitos indiretos intra-cluster, $Y_{11} - Y_{01}$ e $Y_{01} - Y_{00}$. Portanto, visando interpretar corretamente os resultados, os pesquisadores devem ter cuidado ao definir o estimando levando em consideração o potencial de efeitos indiretos intra-cluster.
+
+# 8 Desempenho de análises de experimentos vs. modelos de estudos agrupados (clusterizados)
+
+Em nossa discussão sobre perda de informação, avaliamos abordagens que exigem (1) que o tratamento tenha sido randomizado conforme planejado e (2) que o tratamento atribuído a uma unidade não altere os resultados potenciais de nenhuma outra unidade. Em casos em que essas suposições possam ser violadas, às vezes é mais simples especificar modelos estatísticos que tentem descrever as características de desenhos complexos. Mesmo que não acreditemos nos modelos como descrições científicas de um processo conhecido, isso pode ser uma forma mais informativa e flexível de analisar um experimento do que derivar expressões complexas para estimadores baseados em desenhos.
+
+Nas abordagens baseadas em modelos, a distribuição amostral de um estimador é aproximada usando distribuições de probabilidade para caracterizar nossa incerteza sobre quantidades desconhecidas, como o verdadeiro efeito do tratamento ou a verdadeira média do resultado no nível do cluster. Essas abordagens são chamadas de "baseadas em modelos", porque representam as relações causais como resultantes de distribuições de probabilidade inter-relacionadas. Frequentemente, essas abordagens utilizam "modelos multiníveis", nos quais parâmetros desconhecidos - como diferenças entre clusters - são entendidos como decorrentes de distribuições de probabilidade. Assim, por exemplo, pode haver um modelo para os resultados individuais, cujo intercepto e/ou coeficientes variam de um cluster para outro. Dessa forma, é possível modelar o 'efeito de ser uma unidade no cluster A' separadamente da estimativa do efeito do tratamento. A vantagem dessas abordagens é que elas permitem o 'agrupamento parcial' da variância na população e da variância entre os clusters. Quando um determinado cluster é mal estimado, ele contribui com menos peso para a estimativa, e vice-versa. Portanto, tais modelos geralmente funcionam bem em situações em que há muito poucos dados em alguns clusters: por meio da especificação de uma distribuição posterior bayesiana, eles são capazes de aproveitar informações de todas as partes do estudo. A compensação é que esses modelos, que dependem de pressupostos, estão corretos apenas na medida em que os pressupostos subjacentes a eles são corretos.
+
+Aqui mostramos que o efeito estimado é o mesmo, quer usemos uma diferença simples de médias (por meio de uma OLS - mínimos quadrados ordinários) ou um modelo multinível em nosso cenário simplificado de um estudo com randomização em clusters.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T, error=FALSE, warning=FALSE, message=FALSE}
+library(lme4)
+
+simple_OLS <- lm(Y ~ Z,data = J_30_clusters)
+multilevel <- lmer(Y ~ Z + (1 | j),
+                   data = J_30_clusters,
+  control = lmerControl(optimizer = "bobyqa"),
+  REML = TRUE
+)
+
+kable(round(data.frame(
+  OLS=coef(simple_OLS)["Z"],Multilevel=fixef(multilevel)["Z"]
+  ),3))
+```
+
+Os intervalos de confiança diferem mesmo quando as estimativas são iguais - e há mais de uma maneira de calcular intervalos de confiança e testes de hipóteses para modelos multiníveis. O software R [@bates_et_al_2014lme4] inclui três métodos por padrão, e @gelman2006data recomenda a amostragem MCMC (Cadeias de Markov Monte Carlo) a partir da posterior implícita. Aqui, nos concentramos apenas no método de Wald, pois é o mais rápido de calcular.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T, error=FALSE, message=FALSE, warning=FALSE}
+# Esta função calcula intervalos de confiança para modelos lineares com matrizes de variância e covariância personalizadas.
+confint_HC<-function (coefficients, df, level = 0.95, vcov_mat, ...) {
+  a <- (1 - level)/2
+  a <- c(a, 1 - a)
+  fac <- qt(a, df)
+  ses <- sqrt(diag(vcov_mat))
+  coefficients + ses %o% fac
+}
+
+simple_OLS_CI <-
+  confint_HC(
+    coefficients = coef(simple_OLS),
+    vcov_mat = RCSE(
+      model = simple_OLS,
+                             cluster = J_30_clusters$j,
+      return_cov = TRUE
+    ),
+    df = simple_OLS$df.residual
+  )["Z", ]
+
+multi_wald_CI <- lme4::confint.merMod(
+  multilevel,
+  parm = "Z", method = "Wald"
+)["Z", ]
+multi_profile_CI <- lme4::confint.merMod(
+  multilevel,
+  parm = 4, method = "profile"
+)["Z", ]
+
+
+knitr::kable(round(rbind(
+  Design_Based_CI = simple_OLS_CI,
+  Model_Based_Wald_CI = multi_wald_CI,
+  Model_Based_Profile_CI = multi_profile_CI
+),3))
+```
+
+Podemos calcular uma estimativa do ICC (Intracluster Correlation Coefficient) diretamente a partir das quantidades do modelo (a variância da distribuição Normal prior que representa as diferenças entre os clusters no intercepto, dividida pela variância total da distribuição Normal posterior).
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Click to show code]
+:::
+
+```{r,cache = T}
+VC <- as.data.frame(lme4:::VarCorr.merMod(multilevel))
+round(c(ICC = VC$vcov[1] / sum(VC$vcov)),2)
+```
+
+Para avaliar o desempenho dessa abordagem baseada em modelos, em comparação com as abordagens de erros-padrão robustos por cluster (RCSE) e agregação de clusters mencionadas anteriormente, podemos verificar com que frequência cada abordagem rejeita erroneamente a hipótese nula de não haver efeitos para nenhuma unidade, quando sabemos que essa hipótese nula é verdadeira.
+
+Para fazer isso, podemos escrever uma função que, em primeiro lugar, quebra a relação entre a atribuição do tratamento e o resultado, embaralhando aleatoriamente a atribuição, e em seguida, testa se o valor 0 está no intervalo de confiança de 95% para cada uma das três abordagens, como deveria ser. Lembre-se de que testes válidos teriam taxas de erro dentro de 2 erros padrão de simulação de 0,95 - isso significa que uma hipótese nula correta seria rejeitada no máximo 5% das vezes.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T, message=FALSE}
+Aqui está a tradução do código R fornecido:
+
+# Criar uma função para verificar se o valor 0 está no intervalo de confiança para
+# as abordagens de RCSE, agregação de clusters e estimativa multilevel
+
+sim_0_ate <- function(J, Y) {
+  # Quebrar a relação entre a atribuição do tratamento e os resultados ao embaralhar
+  # aleatoriamente a atribuição
+  z.sim <- sample(1:max(J), max(J) / 2)
+  Z_new <- ifelse(J %in% z.sim == TRUE, 1, 0)
+
+  # Estimar usando o modelo linear para RCSE
+  linear_fit <- lm(Y ~ Z_new)
+  linear_RCSE <- RCSE(
+    model = linear_fit,
+    cluster = J,
+    return_cov = TRUE
+  )
+  linear_CI <- confint_HC(
+    coefficients = coef(linear_fit),
+    vcov_mat = linear_RCSE,
+    df = linear_fit$df.residual
+  )["Z_new", ]
+  # Verificar se o intervalo de confiança contém o valor 0
+  zero_in_CI_RCSE <- (0 >= linear_CI[1]) & (0 <= linear_CI[2])
+
+  # Estimar usando a abordagem de agregação de clusters (Hansen e Bowers 2008)
+  Yj <- tapply(Y, J, sum)
+  Zj <- tapply(Z_new, J, mean)
+  m0 <- unique(table(J))
+  n <- length(Zj)
+  nt <- sum(Zj)
+  # Fazer o teste baseado em Hansen e Bowers 2008 para a diferença de médias
+  # com atribuição ao nível do cluster (assumindo clusters de mesmo tamanho)
+  ones <- rep(1, length(Yj))
+  dp <- crossprod(Zj, Yj) * (n / (m0 * nt * (n - nt))) -
+    crossprod(ones, Yj) / (m0 * (n - nt))
+  obs_ATE <- dp[1, 1]
+  # Valor p bilateral para o teste da hipótese nula de nenhum efeito
+  Vdp <- (n / (m0 * nt * (n - nt))) * (var(Yj) / m0)
+  HB_pval <- 2 * (1 - pnorm(abs(obs_ATE) / sqrt(Vdp)))
+  # Verificar se o valor p é maior que 0,05
+  zero_not_rej_HB <- HB_pval >= 0.05
+
+  # Estimar usando um modelo multilevel
+  multilevel_fit <- lmer(Y ~ Z_new + (1 | J),
+    control = lmerControl(optimizer = "bobyqa"),
+    REML = FALSE
+  )
+
+  multilevel_CI <- lme4:::confint.merMod(
+    multilevel_fit,
+    parm = "Z_new", method = "Wald"
+  )
+  # Verificar se o intervalo de confiança contém o valor 0
+  zero_in_CI_multilevel <- (0 >= multilevel_CI[1]) & (0 <= multilevel_CI[2])
+
+  return(
+    c(
+      ATE = fixef(multilevel_fit)["Z_new"],
+      zero_in_CI_RCSE = zero_in_CI_RCSE,
+      zero_not_rej_HB = zero_not_rej_HB,
+      zero_in_CI_multilevel = zero_in_CI_multilevel
+    )
+  )
+}
+```
+
+Nossa configuração simples mostra que as abordagens de nível individual se comportam de maneira semelhante: tanto a abordagem baseada em design quanto a abordagem baseada em modelo não produzem inferências estatísticas válidas até que o número de clusters seja pelo menos 30. Isso faz sentido, pois ambas as abordagens dependem de teoremas do limite central para que uma lei Normal possa descrever a distribuição da estatística de teste sob a hipótese nula. A abordagem de nível de cluster é sempre válida, mas às vezes produz intervalos de confiança excessivamente grandes (quando o número de clusters é pequeno). Quando o número de clusters é grande (digamos, 100), todas as abordagens são equivalentes em termos de suas taxas de erro. Em desenhos com poucos clusters, deve-se considerar tanto a abordagem de nível de cluster usando a aproximação normal mostrada aqui quanto abordagens diretas baseadas em permutação para inferência estatística.
+
+# 9 Potência estatística para experimentos clusterizados
+
+Queremos experimentos que provavelmente rejeitem hipóteses inconsistentes com os dados e improváveis de rejeitar hipóteses consistentes com os dados. Observamos que as suposições necessárias para a validade de testes comuns (geralmente, grandes números de observações ou grandes quantidades de informações em geral) são desafiadas por experimentos clusterizados, e os testes que levam em conta o agrupamento (cluster) podem ser inválidos se o número de clusters for pequeno (ou se a informação for baixa no nível do cluster em geral). Também vimos que podemos produzir testes estatísticos válidos para hipóteses sobre o efeito médio do tratamento usando tanto Erros Padrão Robustos Clusterizados (RCSE), modelos multiníveis ou usando a abordagem de nível de cluster descrita por @hansen2008covariate, e que o pareamento de pares pode minimizar drasticamente o viés em projetos com tamanhos de cluster desiguais.
+
+A regra mais importante em relação ao poder estatístico de experimentos agrupados (clusterizados) é que mais clusters pequenos são melhores do que menos clusters maiores. Isso pode ser demonstrado por meio de experimentos simulados. De forma geral, a maneira mais flexível de avaliar o poder de um projeto é por meio de simulações, pois permite a incorporação de esquemas de agrupamento e bloqueio complexos, além de poder incluir covariáveis. A seguir, utilizamos o estimador OLS com Erros Padrão Robustos Clusterizados (RCSE), a fim de economizar tempo de computação, mas a mesma análise pode ser realizada com qualquer estimador e estatística de teste.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T}
+
+# Uma função para testar a hipótese nula e a hipótese verdadeira
+test_H0_and_Htrue <- function(J = J,n = n,treatment_effect = treatment_effect,ICC = ICC) {
+  # Criar dados:
+  data <- make_clustered_data(
+    J = J,
+                      n = n,
+                      treatment_effect = treatment_effect,
+    ICC = ICC
+  )
+  linear_fit <- lm(Y ~ Z,data = data)
+
+  RCSE_CI <- confint_HC(
+    coefficients = coef(linear_fit),
+    vcov_mat = RCSE(
+      model = linear_fit,
+                             cluster = data$j,
+      return_cov = TRUE
+    ),
+    df = linear_fit$df.residual
+  )["Z", ]
+
+  # Zero não deve estar neste intervalo de confiança com frequência, pois a hipótese nula de 0 é falsa aqui
+  correct_reject <- !((0 >= RCSE_CI[1]) & (0 <= RCSE_CI[2]))
+
+  # Testar a nulidade dos verdadeiros taus (primeira tentativa é usar o verdadeiro, segunda é fazer 0 verdadeiro)
+  # Reatribuir o tratamento no nível do cluster para que Y seja independente de Z --- portanto, o efeito verdadeiro é 0
+
+  data$Z_new <- ifelse(data$j %in% sample(1:J, max(J)/2), 1, 0)
+
+  linear_fit_true <-lm(Y ~ Z_new,data = data)
+
+  RCSE_CI_true <- confint_HC(
+    coefficients = coef(linear_fit_true),
+    vcov_mat = RCSE(
+      model = linear_fit_true,
+                                             cluster = data$j,
+      return_cov = TRUE
+    ),
+    df = linear_fit$df.residual
+  )["Z_new", ]
+
+  # Zero deve estar neste intervalo de confiança com frequência, pois a hipótese nula de 0 é verdadeira aqui
+  false_positive <-  !((0 >= RCSE_CI_true[1]) & (0 <= RCSE_CI_true[2]))
+
+  return(c(
+    correct_reject = correct_reject,
+    false_positive = false_positive
+  ))
+}
+```
+
+Agora podemos analisar como o poder estatístico é afetado quando o número e o tamanho dos clusters variam, mantendo a ICC constante em 0,01 e o efeito do tratamento constante em 0,2. Vamos avaliar tanto o poder estatístico - que indica com que frequência rejeitamos corretamente a hipótese nula de ausência de efeito quando de fato existe um efeito - quanto o erro - que indica com que frequência rejeitamos incorretamente a hipótese nula quando não há um efeito. Geralmente, desejamos que o poder estatístico seja em torno de 0,8 e a taxa de erro seja em torno de 0,5 (ao usar um nível de confiança de 95%).
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Os números de clusters que iremos considerar
+Js <- c(8,20,40,80,160,320)
+# Os tamanhos dos clusters que iremos considerar
+n_js <- c(8,20,40,80,160,320)
+
+# Cria uma matriz vazia para armazenar os resultados
+# A primeira matriz armazena o poder estatístico e a segunda matriz armazena o erro
+power_J_n <- error_J_n <- matrix(
+  data = NA,
+  nrow = length(Js),
+  ncol = length(n_js),
+  dimnames = list(
+    paste("J =",Js),
+    paste("n_j =",n_js)
+  )
+)
+# Define o número de simulações
+sims <- 100
+
+# Percorre os diferentes números de clusters
+for( j in 1:length(Js)){
+  # Percorre os diferentes tamanhos de clusters
+  for(n in 1:length(n_js)){
+    # Estima o poder estatístico e a taxa de erro para cada combinação
+    test_sims <- replicate(
+      n = sims,
+      expr = test_H0_and_Htrue(
+        J = Js[j],
+        n = n_js[n],
+        treatment_effect = .25,
+        ICC = .01
+      )
+    )
+    power_error <- rowMeans(test_sims)
+    # Armazena os resultados nas matrizes
+    power_J_n[j,n] <- power_error[1]
+    error_J_n[j,n] <- power_error[2]
+  }
+}
+
+# Plota o poder estatístico nas diferentes configurações
+matplot(power_J_n, type = c("b"),pch=1,axes = F,ylim = c(0,1.5),ylab = "power")
+axis(side = 1,labels = rownames(power_J_n),at = 1:6)
+axis(side = 2,at = seq(0,1,.25))
+abline(h=.8)
+legend("top", legend = colnames(power_J_n),col = 1:6 ,pch=1,horiz = TRUE)
+
+```
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Plota a taxa de erro nas diferentes configurações
+matplot(error_J_n, type = c("b"),pch=1,axes = F,ylim = c(0,.5),ylab = "error rate")
+axis(side = 1,labels = rownames(error_J_n),at = 1:6)
+axis(side = 2,at = seq(0,1,.25))
+abline(h=.05)
+legend("top", legend = colnames(error_J_n),col = 1:6 ,pch=1,horiz = TRUE)
+
+```
+
+Observamos que o poder estatístico é sempre baixo quando o número de clusters é baixo, independentemente do tamanho dos clusters. Mesmo com clusters grandes (com 320 unidades cada), o poder estatístico do estudo ainda é relativamente baixo quando o número de clusters é 8. Da mesma forma, é necessário um grande número de clusters para obter poder em um estudo com clusters pequenos: embora seja suficiente ter muitos clusters para obter poder em um experimento, independentemente do tamanho do cluster, o poder aumenta muito mais rapidamente quando os clusters são maiores. Note também que, embora as taxas de erro pareçam estar sistematicamente relacionadas ao número de clusters, o mesmo não ocorre com o tamanho dos clusters.
+
+A seguir, podemos avaliar como a correlação intra-cluster afeta o poder estatístico. Manteremos a estrutura do tamanho da amostra constante em $J=80,n_j=80$ e $J=160,n_j=160$, e compararemos em uma faixa de valores de ICC, desde baixos (.01) até altos (.6).
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T}
+J_njs <- c(80,160)
+ICCs <- seq(0,.6,.1)+c(.01,0,0,0,0,0,0)
+power_ICC <- error_ICC <- matrix(
+  data = NA,
+  nrow = length(ICCs),
+  ncol = length(J_njs),
+  dimnames = list(
+    paste("ICC =",ICCs),
+    paste("J =",J_njs,"n_j = ",J_njs)
+  )
+)
+# Definir o número de simulações
+sims <- 100
+
+# Percorrer as diferentes ICCs
+for( i in 1:length(ICCs)){
+  # Percorrer os diferentes tamanhos de cluster
+  for(j in 1:length(J_njs)){
+    #  Estimar o poder estatístico e a taxa de erro para cada combinação
+    test_sims <- replicate(
+      n = sims,
+      expr = test_H0_and_Htrue(
+        J = J_njs[j],
+                                       n = J_njs[j],
+                                       treatment_effect = .25,
+        ICC = ICCs[i]
+      )
+    )
+    power_error <- rowMeans(test_sims)
+    # Armazená-los nas matrizes
+    power_ICC[i,j] <- power_error[1]
+    error_ICC[i,j] <- power_error[2]
+  }
+}
+
+# Plotar o poder estatístico sob diferentes cenários
+matplot(power_ICC, type = c("b"),pch=1,axes = F,ylim = c(0,1.5),ylab = "power (high ICC)")
+axis(side = 1,labels = rownames(power_ICC),at = 1:7)
+axis(side = 2,at = seq(0,1,.25))
+abline(h=.8)
+legend("top", legend = colnames(power_ICC),col = 1:2 ,pch=1,horiz = TRUE)
+```
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# Plotar a taxa de erro sob diferentes cenários
+matplot(error_ICC, type = c("b"),pch=1,axes = F,ylim = c(0,.5),ylab = "error rate")
+axis(side = 1,labels = rownames(error_ICC),at = 1:7)
+axis(side = 2,at = seq(0,1,.25))
+abline(h=.05)
+legend("top", legend = colnames(error_ICC),col = 1:2 ,pch=1,horiz = TRUE)
+```
+
+Como este exemplo ilustra, uma alta ICC pode reduzir severamente o poder estatístico do estudo, mesmo com muitos clusters grandes.
+
+# 10 Como verificar o equilíbrio em experimentos agrupados (clusterizados) 
+
+As verificações de randomização em experimentos agrupados (clusterizados) seguem a mesma forma da discussão anterior. Um teste válido para o efeito do tratamento é um teste válido para o placebo ou equilíbrio das covariáveis. A única diferença em relação à discussão anterior é que se utiliza uma covariável de fundo ou resultado inicial - alguma variável supostamente não influenciada pelo tratamento - em substituição ao próprio resultado. Portanto, os testes de randomização com um número pequeno de clusters podem ser rápidos demais em declarar um experimento com falta de aleatorização se o analista não estiver ciente dos métodos de análise de taxa de erro que descrevemos acima.
+
+Um novo problema surge no contexto dos testes de randomização. Frequentemente, temos muitas covariáveis que poderiam ser usadas para detectar desequilíbrios desfavoráveis ou problemas de campo com a própria randomização. E, se usarmos testes de hipóteses, é claro que um teste válido que nos encoraja a declarar "desequilíbrio" quando $p < 0,05$ o faria falsamente para uma em cada vinte variáveis testadas. Por esse motivo, recomendamos o uso de testes individuais como uma ferramenta exploratória e o uso de testes globais (como o teste T de Hotelling ou um teste F ou o teste $d^2$ de @hansen2008covariate) , que podem combinar informações de muitos testes dependentes em uma estatística de teste para avaliar o equilíbrio diretamente. No entanto, esses testes devem levar em conta a natureza agrupada do desenho: um simples teste F sem considerar o desenho agrupado provavelmente levará um analista a declarar um desenho desequilibrado e talvez acusar a equipe de campo de uma falha na randomização.
+
+Como os experimentos randomizados em cluster tendem a ter covariáveis ao nível do cluster (por exemplo, tamanho do vilarejo, etc.), verificações de equilíbrio ao nível do cluster fazem sentido e não requerem mudanças explícitas para levar em conta a atribuição em cluster. @hansen2008covariate desenvolvem um teste desse tipo e fornecem um software para implementá-lo. Portanto, por exemplo, se tivéssemos 10 covariáveis medidas ao nível da vila e um grande número de vilas, poderíamos avaliar uma hipótese global de equilíbrio usando essa ferramenta baseada no desenho, mas aplicável a grandes amostras.
+
+Aqui mostramos apenas os resultados do teste omnibus. As avaliações individuais que compõem o teste omnibus também estão disponíveis no objeto `balance_test`. Neste caso, o teste omnibus nos informa que temos pouca evidência contra a hipótese nula de que essas observações surgiram de um estudo randomizado.
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache = T}
+library(RItools)
+options(digits=3)
+
+# Gerar um conjunto de dados no nível do vilarejo
+villages <- aggregate(pretend_data,by = list(village = pretend_data$j), mean)
+
+# Gerar 10 covariáveis falsas
+set.seed(12345)
+villages[paste("x",1:10,sep="")] <- matrix(rnorm(nrow(villages)*10), ncol=10)
+balance_formula <- reformulate(paste("x",1:10,sep=""), response="Z")
+# Realizar um teste de equilíbrio de amostra grande e baseado em design
+balance_test <-xBalance(balance_formula,
+                        strata=list(noblocks=NULL),
+                        data=villages,
+  report = c(
+    "std.diffs", "z.scores", "adj.means",
+    "adj.mean.diffs", "chisquare.test", "p.values"
+  )
+)
+
+# Os resultados dos testes de equilíbrio 1 por 1
+kable(round(balance_test$results,2),align = "c")
+```
+
+```{=html}
+<style>
+div.hidecode + pre {display: none}
+</style>
+```
+```{=html}
+<script>
+doclick=function(e){
+e.nextSibling.nextSibling.style.display="block";
+}
+</script>
+```
+::: {.hidecode onclick="doclick(this);"}
+[Clique para ver o código]
+:::
+
+```{r,cache=T}
+# O valor-p geral do teste omnibus.
+kable(round(balance_test$overall,2),align = "c")
+```
+
+Nesse caso, não podemos rejeitar a hipótese omnibus de balanceamento, mesmo que, como esperado, tenhamos alguns covariáveis com $p$-valores falsamente baixos. Uma maneira de interpretar esse resultado omnibus é dizer que tais desequilíbrios em algumas covariáveis não alterariam apreciavelmente quaisquer inferências estatísticas que fazemos sobre os efeitos do tratamento, desde que essas covariáveis não previssem fortemente os resultados no grupo de controle. Alternativamente, poderíamos dizer que qualquer experimento grande pode tolerar um desequilíbrio aleatório em algumas covariáveis (não mais do que aproximadamente 5% se estivermos usando $α = 0,05$ como nosso limiar para rejeitar hipóteses).
+
+# Referências
