@@ -23,15 +23,7 @@ e.nextSibling.nextSibling.style.display="block";
 }
 </script>
 ```
-# 10 Pontos para Entender Randomização de Agrupamentos (Clusters)
-
-[In English](https://egap.org/resource/10-things-to-know-about-cluster-randomization/)
-
-[En Español](https://egap.org/es/resource/10-cosas-sobre-la-aleatorizacion-por-aglomerados/)
-
-[En Français](https://egap.org/fr/resource/10-choses-a-savoir-sur-la-randomisation-par-grappe/)
-
-Autor: [Jake Bowers](https://egap.org/resource/10-things-to-know-about-cluster-randomization/)
+<!-- title: "10 Pontos para Entender Randomização de Agrupamentos (Clusters)" -->
 
 ```{r,echo=FALSE, message=FALSE}
 rm(list = ls())
